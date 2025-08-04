@@ -61,18 +61,21 @@ const plantLibrary: PlantData[] = [
         name: 'Lavender',
         growthCost: { water: 1, light: 1 },
         basePoints: 2,
+        // Synergy: +1 for each different plant neighbor
         synergy: (neighbors) => neighbors.filter(t => t?.type === 'plant' && t.plant.name !== 'Lavender').length > 0 ? 1 : 0,
     },
     {
         name: 'Sunflower',
         growthCost: { light: 2 },
         basePoints: 2,
+        // Synergy: +1 if any compost neighbor
         synergy: (neighbors) => neighbors.some(t => t?.type === 'compost') ? 1 : 0,
     },
     {
         name: 'Mushroom',
         growthCost: { compost: 2 },
         basePoints: 1,
+        // Synergy: +1 if any Tree neighbor
         synergy: (neighbors) => neighbors.some(t => t?.type === 'plant' && t.plant.name === 'Tree') ? 1 : 0,
     },
     {
@@ -85,6 +88,7 @@ const plantLibrary: PlantData[] = [
         name: 'Daisy',
         growthCost: { water: 1, light: 1 },
         basePoints: 1,
+        // Synergy: +1 if any plant neighbor
         synergy: (neighbors) => neighbors.some(t => t?.type === 'plant') ? 1 : 0,
     },
 ];
