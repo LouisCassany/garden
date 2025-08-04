@@ -19,6 +19,7 @@ interface TileBase {
 export interface PlantTile extends TileBase {
     type: 'plant';
     plant: PlantData;
+    pointsGenerated?: number; // Track points this tile contributed
 }
 
 interface CompostTile extends TileBase {
@@ -88,7 +89,6 @@ const plantLibrary: PlantData[] = [
         name: 'Daisy',
         growthCost: { water: 1, light: 1 },
         basePoints: 1,
-        // Synergy: +1 if any plant neighbor
         synergy: (neighbors) => neighbors.some(t => t?.type === 'plant') ? 1 : 0,
     },
 ];
@@ -153,15 +153,18 @@ export class SharedGardenGame {
         const existing = this.state.grid[y][x];
 
         if (tile.type === 'pest') {
-            // Place pest regardless of target, but destroy plant if it's not grown
-            if (this.isPlantTile(existing) && !existing.grown) {
-                this.state.grid[y][x] = tile;
-                this.log(`Pest destroyed plant at (${x}, ${y})`);
+            // Handle point loss if replacing a grown plant
+            if (this.isPlantTile(existing) && existing.grown && existing.pointsGenerated) {
+                this.state.score -= existing.pointsGenerated;
+                this.log(`Pest destroyed grown ${existing.plant.name} at (${x}, ${y}) - lost ${existing.pointsGenerated} points`);
+            } else if (this.isPlantTile(existing) && !existing.grown) {
+                this.log(`Pest destroyed ungrown ${existing.plant.name} at (${x}, ${y})`);
             } else {
-                this.state.grid[y][x] = tile;
                 this.log(`Pest placed at (${x}, ${y})`);
             }
 
+            // Place pest regardless of target
+            this.state.grid[y][x] = tile;
             this.checkInfestation(x, y);
             return true;
         }
@@ -198,6 +201,9 @@ export class SharedGardenGame {
         const neighbors = this.getNeighbors(x, y);
         const bonus = tile.plant.synergy(neighbors);
         const points = tile.plant.basePoints + bonus;
+
+        // Track points for this tile
+        tile.pointsGenerated = points;
 
         this.state.score += points;
         this.log(`Grew ${tile.plant.name} at (${x}, ${y}) for ${points} points`);
