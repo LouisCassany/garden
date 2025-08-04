@@ -13,6 +13,38 @@ function findRandomEmptyCell(grid: (any | null)[][]): [number, number] | null {
     return empty[Math.floor(Math.random() * empty.length)];
 }
 
+// Find all ungrown plants on the board
+function findUngrownPlants(state: GameState): Array<{ x: number, y: number, tile: any }> {
+    const ungrown: Array<{ x: number, y: number, tile: any }> = [];
+
+    for (let y = 0; y < state.grid.length; y++) {
+        for (let x = 0; x < state.grid[y].length; x++) {
+            const tile = state.grid[y][x];
+            if (tile && tile.type === 'plant' && !tile.grown) {
+                ungrown.push({ x, y, tile });
+            }
+        }
+    }
+
+    return ungrown;
+}
+
+// Try to grow plants in order of resource efficiency (cheapest first)
+function tryGrowAllPlants(game: SharedGardenGame): void {
+    const ungrownPlants = findUngrownPlants(game.state);
+
+    if (ungrownPlants.length === 0) return;
+
+    // Try to grow each plant
+    for (const { x, y, tile } of ungrownPlants) {
+        const grown = game.growPlant(x, y);
+        if (!grown) {
+            game.log(`🌿 Could not grow ${tile.plant.name} at (${x}, ${y}) due to resource limits.`);
+        }
+        // Continue trying other plants even if this one failed
+    }
+}
+
 // Map plant names to single characters
 const plantCharMap: Record<string, string> = {
     Lavender: 'L',
@@ -35,7 +67,7 @@ function drawBoardInline(state: GameState): string[] {
     lines.push('   A  B  C  D  E'); // Column headers
 
     for (let y = 0; y < state.grid.length; y++) {
-        let row = `${y + 1} `; // Row number
+        let row = `${y + 1} `;
         for (let x = 0; x < state.grid[y].length; x++) {
             const tile = state.grid[y][x];
             row += getSymbol(tile) + ' ';
@@ -69,6 +101,7 @@ console.log('🌱 Starting Shared Garden simulation...\n');
 // Game loop
 while (!game.isGameOver() && !game.isVictory()) {
 
+    game.log('\n')
     game.gainRandomResource();
 
     const tile = game.drawTile();
@@ -85,15 +118,10 @@ while (!game.isGameOver() && !game.isVictory()) {
     const placed = game.placeTile(tile, x, y);
     if (!placed) {
         game.log(`❌ Failed to place ${tile.type} at (${x}, ${y})`);
-    } else {
-        if (tile.type === 'plant') {
-            const grown = game.growPlant(x, y);
-            if (!grown) {
-                game.log(`🌿 Could not grow ${tile.plant.name} at (${x}, ${y}) due to resource limits.`);
-            }
-        }
     }
 
+    // Try to grow ALL ungrown plants on the board, not just the one we placed
+    tryGrowAllPlants(game);
 
     // Add board snapshot to the log
     const layout = drawBoardInline(game.state);
