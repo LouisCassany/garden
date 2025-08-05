@@ -1,5 +1,5 @@
 import { drawPlayerBoard, MultiplayerGardenGame } from './engine.ts';
-import type { PlayerState, Tile } from './engine.ts';
+import type { Tile } from './engine.ts';
 
 // Utility to find a random empty cell
 function findRandomEmptyCell(grid: (Tile | null)[][]): [number, number] | null {
