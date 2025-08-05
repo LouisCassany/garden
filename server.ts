@@ -9,10 +9,28 @@ const GAME_SETTINGS = {
 };
 
 let game: MultiplayerGardenGame | null = null;
+const sockets = new Set<WebSocket>();
+
+function broadcastGameState() {
+    if (!game) return;
+    const message = JSON.stringify({ type: "update", state: game.state });
+    for (const socket of sockets) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(message);
+        }
+    }
+}
 
 Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
     const { pathname } = new URL(req.url);
     const method = req.method;
+
+    // Handle WebSocket upgrade
+    if (pathname === "/ws") {
+        const { response, socket } = Deno.upgradeWebSocket(req);
+        sockets.add(socket);
+        return response;
+    }
 
     const json = async () => {
         try {
@@ -29,6 +47,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
             return Response.json({ error: "Need at least 2 player IDs" }, { status: 400 });
         }
         game = new MultiplayerGardenGame(playerIds, GAME_SETTINGS);
+        broadcastGameState();
         return Response.json({ message: "Game created", state: game.state });
     }
 
@@ -40,6 +59,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         const { success: tile, reason } = game.pickFromDraft(playerId, tileIndex);
         if (!tile) return Response.json({ error: reason }, { status: 400 });
 
+        broadcastGameState();
         return Response.json({ tile, state: game.state });
     }
 
@@ -51,6 +71,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         const { success, reason } = game.placeTile(playerId, tile as Tile, x, y);
         if (!success) return Response.json({ error: reason }, { status: 400 });
 
+        broadcastGameState();
         return Response.json({ success, state: game.state });
     }
 
@@ -62,19 +83,18 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         const { success, reason } = game.growPlant(playerId, x, y);
         if (!success) return Response.json({ error: reason }, { status: 400 });
 
+        broadcastGameState();
         return Response.json({ success, state: game.state });
     }
 
     if (method === "POST" && pathname === "/game/next-turn") {
         if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
 
-        game.nextTurn();
-        if (game.isGameOver()) {
-            const winner = game.getWinner();
-            return Response.json({ gameOver: true, winner, state: game.state });
-        }
+        const isGameOver = game.nextTurn();
+        const winner = isGameOver ? game.getWinner() : undefined;
 
-        return Response.json({ state: game.state });
+        broadcastGameState();
+        return Response.json({ isGameOver, winner, state: game.state });
     }
 
     if (method === "GET" && pathname === "/game/state") {
