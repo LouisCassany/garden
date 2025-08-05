@@ -11,9 +11,13 @@ export interface PlayerState {
     score: number;
     resources: Record<Resource, number>;
     infestation: number;
+    canDraft: boolean
+    canGrow: boolean;
+    canPlace: boolean;
+    mustPlacePest: boolean
 }
 
-interface MultiplayerGameState {
+export interface MultiplayerGameState {
     players: Record<PlayerId, PlayerState>;
     deck: Tile[];
     draftZone: Tile[];
@@ -125,7 +129,11 @@ export class MultiplayerGardenGame {
                 garden: Array.from({ length: settings.GRID_SIZE }, () => Array(settings.GRID_SIZE).fill(null)),
                 score: 0,
                 resources: { water: 0, light: 0, compost: 0 },
-                infestation: 0
+                infestation: 0,
+                canDraft: true,
+                canGrow: true,
+                canPlace: true,
+                mustPlacePest: false
             };
         }
 
@@ -137,8 +145,6 @@ export class MultiplayerGardenGame {
             currentPlayer: playerIds[0],
             log: []
         };
-
-        console.log(this.state.players)
 
         // Fill the draft zone with cards ensuring pest are not drawn first
         while (this.state.draftZone.length < settings.DRAFT_SIZE) {
@@ -153,6 +159,7 @@ export class MultiplayerGardenGame {
                 }
             }
         }
+
     }
 
     // Init action
@@ -187,12 +194,14 @@ export class MultiplayerGardenGame {
         if (playerId !== this.state.currentPlayer) return { success: null, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
         if (!playerState) return { success: null, reason: 'Player not found' };
+        if (!playerState.canDraft) return { success: null, reason: 'Cannot draft this turn' };
 
         if (tileIndex < 0 || tileIndex >= this.state.draftZone.length) return { success: null, reason: 'Invalid tile index' };
 
         const tile = this.state.draftZone[tileIndex];
         this.state.draftZone.splice(tileIndex, 1);
         this.log(`Player ${playerId} picked ${tile.type === 'plant' ? tile.plant.name : tile.type}`);
+        playerState.canDraft = false; // Disable drafting for this player
         return { success: tile, reason: undefined };
     }
 
@@ -201,6 +210,7 @@ export class MultiplayerGardenGame {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
         if (!playerState) return { success: false, reason: 'Player not found' };
+        if (!playerState.canGrow) return { success: false, reason: 'Cannot grow this turn' };
 
         const tile = playerState.garden[y][x];
         if (!this.isPlantTile(tile) || tile.grown) return { success: false, reason: 'Invalid tile to grow (not plant or already grown)' };
@@ -220,6 +230,7 @@ export class MultiplayerGardenGame {
         playerState.score += points;
 
         this.log(`Player ${playerId} grew ${tile.plant.name} at (${x}, ${y}) for ${points} points`);
+        playerState.canGrow = false;
 
         return { success: true, reason: undefined };
     }
@@ -229,6 +240,7 @@ export class MultiplayerGardenGame {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
         if (!playerState) return { success: false, reason: 'Player not found' };
+        if (!playerState.canPlace) return { success: false, reason: 'Cannot place tile this turn' };
 
         if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
         const existing = playerState.garden[y][x];
@@ -251,6 +263,7 @@ export class MultiplayerGardenGame {
             // Place pest and check for infestation
             playerState.garden[y][x] = tile;
             this.checkInfestation(playerId, x, y);
+            playerState.canPlace = false;
             return { success: true, reason: undefined };
         }
 
@@ -264,6 +277,7 @@ export class MultiplayerGardenGame {
             this.gainResource(playerId, 'compost', 1);
         }
 
+        playerState.canPlace = false;
         return { success: true, reason: undefined };
     }
 
@@ -300,7 +314,7 @@ export class MultiplayerGardenGame {
             .filter(Boolean) as Tile[];
     }
 
-    nextTurn(): void {
+    nextTurn(): boolean {
         const playerIds = Object.keys(this.state.players);
         const currentIndex = playerIds.indexOf(this.state.currentPlayer);
         const nextIndex = (currentIndex + 1) % playerIds.length;
@@ -309,7 +323,29 @@ export class MultiplayerGardenGame {
             this.state.currentTurn++;
         }
 
+        // New turn setup
         this.state.currentPlayer = playerIds[nextIndex];
+        this.state.players[this.state.currentPlayer].canDraft = true;
+        this.state.players[this.state.currentPlayer].canGrow = true;
+        this.state.players[this.state.currentPlayer].canPlace = true;
+        this.state.players[this.state.currentPlayer].mustPlacePest = false;
+
+        const newCard = this.drawTile();
+        if (newCard) {
+            if (newCard.type == 'pest') {
+                // All players must place a pest tile if available
+                for (const player of Object.values(this.state.players)) {
+                    player.mustPlacePest = true;
+                }
+                this.log(`All players must place a pest tile this turn`);
+            } else {
+                // Add the new card to the draft zone
+                this.state.draftZone.push(newCard);
+                this.log(`New card drawn: ${newCard.type === 'plant' ? newCard.plant.name : newCard.type}`);
+            }
+        }
+
+        return this.isGameOver();
     }
 
     isGameOver(): boolean {
@@ -424,4 +460,58 @@ export function getSymbol(tile: Tile | null): string {
     }
 
     return '??'; // fallback
+}
+
+export function displayGame(state: MultiplayerGameState) {
+    const output: string[] = [];
+
+    // Display draft zone
+    output.push('Draft Zone:');
+    let draftLine = '';
+    for (let i = 0; i < state.draftZone.length; i++) {
+        const tile = state.draftZone[i];
+        if (tile.type === "plant") {
+            draftLine += `[${i}:${tile.plant.name}] `;
+        } else {
+            draftLine += `[${i}:${tile.type}] `;
+        }
+    }
+    output.push(draftLine);
+    output.push('');
+
+    // Get all player boards
+    const playerBoards = Object.values(state.players).map(player =>
+        drawPlayerBoard(player)
+    );
+
+    // Find the maximum height of player boards
+    const maxHeight = Math.max(...playerBoards.map(board => board.length));
+
+    // Combine boards side by side
+    for (let i = 0; i < maxHeight; i++) {
+        let line = '';
+        for (const board of playerBoards) {
+            // Add padding between boards
+            if (line) line += '    ';
+            // Get line from board or empty string if board doesn't have this line
+            line += (board[i] || '').padEnd(30);
+        }
+        output.push(line);
+    }
+
+    // Print current turn info
+    output.push('');
+    output.push(`Turn ${state.currentTurn} - Current Player: ${state.currentPlayer}`);
+
+    // Display the last 3 log entries if any
+    if (state.log.length > 0) {
+        output.push('');
+        output.push('Recent actions:');
+        state.log.slice(-3).forEach(log => output.push(log));
+    }
+
+    // Print everything with proper alignment
+    console.log(`
+${output.join('\n')}
+`);
 }
