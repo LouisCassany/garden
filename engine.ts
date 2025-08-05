@@ -14,7 +14,7 @@ export interface PlayerState {
     canDraft: boolean
     canGrow: boolean;
     canPlace: boolean;
-    mustPlacePest: boolean
+    pestToPlace: 0,
 }
 
 export interface MultiplayerGameState {
@@ -133,7 +133,7 @@ export class MultiplayerGardenGame {
                 canDraft: true,
                 canGrow: true,
                 canPlace: true,
-                mustPlacePest: false
+                pestToPlace: 0
             };
         }
 
@@ -328,21 +328,20 @@ export class MultiplayerGardenGame {
         this.state.players[this.state.currentPlayer].canDraft = true;
         this.state.players[this.state.currentPlayer].canGrow = true;
         this.state.players[this.state.currentPlayer].canPlace = true;
-        this.state.players[this.state.currentPlayer].mustPlacePest = false;
+        this.state.players[this.state.currentPlayer].pestToPlace = 0;
 
-        const newCard = this.drawTile();
-        if (newCard) {
-            if (newCard.type == 'pest') {
-                // All players must place a pest tile if available
-                for (const player of Object.values(this.state.players)) {
-                    player.mustPlacePest = true;
-                }
-                this.log(`All players must place a pest tile this turn`);
-            } else {
-                // Add the new card to the draft zone
-                this.state.draftZone.push(newCard);
-                this.log(`New card drawn: ${newCard.type === 'plant' ? newCard.plant.name : newCard.type}`);
+        // Draw a new tile and while we draw pest tiles, count them
+        let newCard = this.drawTile();
+        while (newCard?.type === 'pest') {
+            // Increase pest count for all players
+            for (const player of Object.values(this.state.players)) {
+                player.pestToPlace++;
             }
+            this.log(`All players must place a pest tile this turn`);
+            newCard = this.drawTile();
+        }
+        if (newCard) {
+            this.state.draftZone.push(newCard);
         }
 
         return this.isGameOver();
@@ -428,7 +427,7 @@ export function drawPlayerBoard(player: PlayerState): string[] {
     lines.push(
         `Player ${player.id}`
     );
-    lines.push(`💧: ${water}  ☀️: ${light}  🌾: ${compost}`)
+    lines.push(`🐀: ${player.pestToPlace}  💧: ${water}  ☀️: ${light}  🌾: ${compost}`)
     lines.push(
         `Score: ${player.score} | Infestations: ${player.infestation}`
     )

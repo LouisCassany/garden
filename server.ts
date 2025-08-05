@@ -14,6 +14,7 @@ const sockets = new Set<WebSocket>();
 function broadcastGameState() {
     if (!game) return;
     const message = JSON.stringify({ type: "update", state: game.state });
+    console.log("Broadcasting game state to", sockets.size, "clients");
     for (const socket of sockets) {
         if (socket.readyState === WebSocket.OPEN) {
             socket.send(message);
