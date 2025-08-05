@@ -62,13 +62,12 @@ export interface GameState {
     log: string[];
 }
 
-// Constants
-const GRID_SIZE = 5;
-const MAX_RESOURCES = 5;
-const MAX_INFESTATIONS = 3;
-const DRAFT_SIZE = 4;
-const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 4;
+type Settings = {
+    GRID_SIZE: number;
+    MAX_RESOURCES: number;
+    MAX_INFESTATIONS: number;
+    DRAFT_SIZE: number;
+}
 
 // Utility
 function generateId(): string {
@@ -114,17 +113,16 @@ const plantLibrary: PlantData[] = [
 
 export class MultiplayerGardenGame {
     state: MultiplayerGameState;
+    private readonly settings: Settings
 
-    constructor(playerIds: PlayerId[]) {
-        if (playerIds.length < MIN_PLAYERS || playerIds.length > MAX_PLAYERS) {
-            throw new Error(`Game requires ${MIN_PLAYERS}-${MAX_PLAYERS} players`);
-        }
+    constructor(playerIds: PlayerId[], settings: Settings) {
+        this.settings = settings;
 
         const players = new Map<PlayerId, PlayerState>();
         for (const id of playerIds) {
             players.set(id, {
                 id,
-                garden: Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)),
+                garden: Array.from({ length: settings.GRID_SIZE }, () => Array(settings.GRID_SIZE).fill(null)),
                 score: 0,
                 resources: { water: 0, light: 0, compost: 0 },
                 infestation: 0
@@ -141,7 +139,7 @@ export class MultiplayerGardenGame {
         };
 
         // Fill the draft zone with cards ensuring pest are not drawn first
-        while (this.state.draftZone.length < DRAFT_SIZE) {
+        while (this.state.draftZone.length < settings.DRAFT_SIZE) {
             const tile = this.drawTile();
             if (tile) {
                 // If it's a pest, put it back in the deck, shuffle the deck and refill the draft zone
@@ -272,7 +270,7 @@ export class MultiplayerGardenGame {
     private gainResource(playerId: PlayerId, type: Resource, amount: number): void {
         const playerState = this.state.players.get(playerId);
         if (!playerState) return;
-        playerState.resources[type] = Math.min(MAX_RESOURCES, playerState.resources[type] + amount);
+        playerState.resources[type] = Math.min(this.settings.MAX_RESOURCES, playerState.resources[type] + amount);
     }
 
     // Game action
@@ -310,7 +308,7 @@ export class MultiplayerGardenGame {
     isGameOver(): boolean {
         // Game ends if any player hits the conditions
         return Array.from(this.state.players.values()).some(player =>
-            player.infestation >= MAX_INFESTATIONS ||
+            player.infestation >= this.settings.MAX_INFESTATIONS ||
             this.state.deck.length === 0 ||
             player.garden.every(row => row.every(cell => cell !== null))
         );
@@ -341,7 +339,7 @@ export class MultiplayerGardenGame {
     }
 
     inBounds(x: number, y: number): boolean {
-        return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
+        return x >= 0 && x < this.settings.GRID_SIZE && y >= 0 && y < this.settings.GRID_SIZE;
     }
 
     private isPlantTile(tile: Tile | null): tile is PlantTile {

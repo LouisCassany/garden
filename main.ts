@@ -18,7 +18,12 @@ function randomInt(min: number, max: number): number {
 }
 
 const playerIds = ['Alice', 'Bob'];
-const game = new MultiplayerGardenGame(playerIds);
+const game = new MultiplayerGardenGame(playerIds, {
+    DRAFT_SIZE: 5,
+    GRID_SIZE: 5,
+    MAX_INFESTATIONS: 3,
+    MAX_RESOURCES: 5,
+});
 
 
 const currentPlayer = game.state.currentPlayer;
