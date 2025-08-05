@@ -1,9 +1,9 @@
-// Types
 type Resource = 'water' | 'light' | 'compost';
 type TileType = 'plant' | 'compost' | 'pest';
 type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy';
+type Result<T> = { success: T, reason?: string };
 
-type PlayerId = string;
+export type PlayerId = string;
 
 export interface PlayerState {
     id: PlayerId;
@@ -14,7 +14,7 @@ export interface PlayerState {
 }
 
 interface MultiplayerGameState {
-    players: Map<PlayerId, PlayerState>;
+    players: Record<PlayerId, PlayerState>;
     deck: Tile[];
     draftZone: Tile[];
     currentTurn: number;
@@ -118,15 +118,15 @@ export class MultiplayerGardenGame {
     constructor(playerIds: PlayerId[], settings: Settings) {
         this.settings = settings;
 
-        const players = new Map<PlayerId, PlayerState>();
+        const players: Record<PlayerId, PlayerState> = {};
         for (const id of playerIds) {
-            players.set(id, {
+            players[id] = {
                 id,
                 garden: Array.from({ length: settings.GRID_SIZE }, () => Array(settings.GRID_SIZE).fill(null)),
                 score: 0,
                 resources: { water: 0, light: 0, compost: 0 },
                 infestation: 0
-            });
+            };
         }
 
         this.state = {
@@ -137,6 +137,8 @@ export class MultiplayerGardenGame {
             currentPlayer: playerIds[0],
             log: []
         };
+
+        console.log(this.state.players)
 
         // Fill the draft zone with cards ensuring pest are not drawn first
         while (this.state.draftZone.length < settings.DRAFT_SIZE) {
@@ -181,26 +183,30 @@ export class MultiplayerGardenGame {
     }
 
     // Player action
-    pickFromDraft(playerId: PlayerId, tileIndex: number): Tile | null {
-        if (playerId !== this.state.currentPlayer) return null;
-        if (tileIndex < 0 || tileIndex >= this.state.draftZone.length) return null;
+    pickFromDraft(playerId: PlayerId, tileIndex: number): Result<Tile | null> {
+        if (playerId !== this.state.currentPlayer) return { success: null, reason: 'Not your turn' };
+        const playerState = this.state.players[playerId];
+        if (!playerState) return { success: null, reason: 'Player not found' };
+
+        if (tileIndex < 0 || tileIndex >= this.state.draftZone.length) return { success: null, reason: 'Invalid tile index' };
 
         const tile = this.state.draftZone[tileIndex];
         this.state.draftZone.splice(tileIndex, 1);
         this.log(`Player ${playerId} picked ${tile.type === 'plant' ? tile.plant.name : tile.type}`);
-        return tile;
+        return { success: tile, reason: undefined };
     }
 
     // Player action
-    growPlant(playerId: PlayerId, x: number, y: number): boolean {
-        const playerState = this.state.players.get(playerId);
-        if (!playerState) return false;
+    growPlant(playerId: PlayerId, x: number, y: number): Result<boolean> {
+        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+        const playerState = this.state.players[playerId];
+        if (!playerState) return { success: false, reason: 'Player not found' };
 
         const tile = playerState.garden[y][x];
-        if (!this.isPlantTile(tile) || tile.grown) return false;
+        if (!this.isPlantTile(tile) || tile.grown) return { success: false, reason: 'Invalid tile to grow (not plant or already grown)' };
 
         const cost = tile.plant.growthCost;
-        if (!this.hasResources(playerId, cost)) return false;
+        if (!this.hasResources(playerId, cost)) return { success: false, reason: 'Not enough resources' };
 
         this.spendResources(playerId, cost);
         tile.grown = true;
@@ -215,22 +221,23 @@ export class MultiplayerGardenGame {
 
         this.log(`Player ${playerId} grew ${tile.plant.name} at (${x}, ${y}) for ${points} points`);
 
-        return true;
+        return { success: true, reason: undefined };
     }
 
     // Player action
-    placeTile(playerId: PlayerId, tile: Tile, x: number, y: number): boolean {
-        const playerState = this.state.players.get(playerId);
-        if (!playerState) return false;
+    placeTile(playerId: PlayerId, tile: Tile, x: number, y: number): Result<boolean> {
+        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+        const playerState = this.state.players[playerId];
+        if (!playerState) return { success: false, reason: 'Player not found' };
 
-        if (!this.inBounds(x, y)) return false;
+        if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
         const existing = playerState.garden[y][x];
 
         if (tile.type === 'pest') {
             // Don't allow pest placement on compost or other pests
             if (existing?.type === 'compost' || existing?.type === 'pest') {
                 this.log(`Player ${playerId}: Cannot place pest on ${existing.type} at (${x}, ${y})`);
-                return false;
+                return { success: false, reason: 'Cannot place pest on compost or other pests' };
             }
 
             // If placing on a plant, reduce score by plant's base points
@@ -244,11 +251,11 @@ export class MultiplayerGardenGame {
             // Place pest and check for infestation
             playerState.garden[y][x] = tile;
             this.checkInfestation(playerId, x, y);
-            return true;
+            return { success: true, reason: undefined };
         }
 
         // For non-pest tiles, only allow placement on empty spaces
-        if (existing) return false;
+        if (existing) return { success: false, reason: 'Tile already exists at this position' };
 
         playerState.garden[y][x] = tile;
         this.log(`Player ${playerId} placed ${tile.type} at (${x}, ${y})`);
@@ -257,7 +264,7 @@ export class MultiplayerGardenGame {
             this.gainResource(playerId, 'compost', 1);
         }
 
-        return true;
+        return { success: true, reason: undefined };
     }
 
     // Game action
@@ -268,14 +275,14 @@ export class MultiplayerGardenGame {
 
     // Game action
     private gainResource(playerId: PlayerId, type: Resource, amount: number): void {
-        const playerState = this.state.players.get(playerId);
+        const playerState = this.state.players[playerId];
         if (!playerState) return;
         playerState.resources[type] = Math.min(this.settings.MAX_RESOURCES, playerState.resources[type] + amount);
     }
 
     // Game action
     private checkInfestation(playerId: PlayerId, x: number, y: number): void {
-        const playerState = this.state.players.get(playerId);
+        const playerState = this.state.players[playerId];
         if (!playerState) return;
 
         const neighbors = this.getNeighbors(playerState.garden, x, y);
@@ -294,7 +301,7 @@ export class MultiplayerGardenGame {
     }
 
     nextTurn(): void {
-        const playerIds = Array.from(this.state.players.keys());
+        const playerIds = Object.keys(this.state.players);
         const currentIndex = playerIds.indexOf(this.state.currentPlayer);
         const nextIndex = (currentIndex + 1) % playerIds.length;
 
@@ -307,7 +314,8 @@ export class MultiplayerGardenGame {
 
     isGameOver(): boolean {
         // Game ends if any player hits the conditions
-        return Array.from(this.state.players.values()).some(player =>
+
+        return Array.from(Object.values(this.state.players)).some(player =>
             player.infestation >= this.settings.MAX_INFESTATIONS ||
             this.state.deck.length === 0 ||
             player.garden.every(row => row.every(cell => cell !== null))
@@ -320,7 +328,7 @@ export class MultiplayerGardenGame {
         let highestScore = -1;
         let winner: PlayerId | null = null;
 
-        for (const [playerId, player] of this.state.players) {
+        for (const [playerId, player] of Object.entries(this.state.players)) {
             if (player.score > highestScore) {
                 highestScore = player.score;
                 winner = playerId;
@@ -347,7 +355,7 @@ export class MultiplayerGardenGame {
     }
 
     private hasResources(playerId: PlayerId, cost: Partial<Record<Resource, number>>): boolean {
-        const playerState = this.state.players.get(playerId);
+        const playerState = this.state.players[playerId];
         if (!playerState) return false;
 
         return Object.entries(cost).every(([resource, amount]) =>
@@ -356,7 +364,7 @@ export class MultiplayerGardenGame {
     }
 
     private spendResources(playerId: PlayerId, cost: Partial<Record<Resource, number>>): void {
-        const playerState = this.state.players.get(playerId);
+        const playerState = this.state.players[playerId];
         if (!playerState) return;
 
         for (const [resource, amount] of Object.entries(cost)) {
