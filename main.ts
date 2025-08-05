@@ -1,8 +1,8 @@
-import { SharedGardenGame } from './engine.ts';
-import type { GameState, Tile } from './engine.ts';
+import { drawPlayerBoard, MultiplayerGardenGame } from './engine.ts';
+import type { PlayerState, Tile } from './engine.ts';
 
 // Utility to find a random empty cell
-function findRandomEmptyCell(grid: (any | null)[][]): [number, number] | null {
+function findRandomEmptyCell(grid: (Tile | null)[][]): [number, number] | null {
     const empty: [number, number][] = [];
     for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < grid[y].length; x++) {
@@ -13,133 +13,77 @@ function findRandomEmptyCell(grid: (any | null)[][]): [number, number] | null {
     return empty[Math.floor(Math.random() * empty.length)];
 }
 
-// Find all ungrown plants on the board
-function findUngrownPlants(state: GameState): Array<{ x: number, y: number, tile: any }> {
-    const ungrown: Array<{ x: number, y: number, tile: any }> = [];
+function randomInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-    for (let y = 0; y < state.grid.length; y++) {
-        for (let x = 0; x < state.grid[y].length; x++) {
-            const tile = state.grid[y][x];
-            if (tile && tile.type === 'plant' && !tile.grown) {
-                ungrown.push({ x, y, tile });
-            }
+const playerIds = ['Alice', 'Bob'];
+const game = new MultiplayerGardenGame(playerIds);
+
+
+const currentPlayer = game.state.currentPlayer;
+
+// Test picking a tile from the draft zone
+console.log(`Current player: ${currentPlayer}`);
+const draftIndex = randomInt(0, game.state.draftZone.length - 1);
+displayDraftZone()
+const pickedTile = game.pickFromDraft(currentPlayer, draftIndex);
+console.log(`Player ${currentPlayer} picked tile at index ${draftIndex}`);
+displayDraftZone()
+
+// Test random placement of the picked tile
+const tile = findRandomEmptyCell(game.state.players.get(currentPlayer)!.garden);
+if (tile && pickedTile) {
+    game.placeTile(currentPlayer, pickedTile, tile[0], tile[1]);
+}
+console.log(drawPlayerBoard(game.state.players.get(currentPlayer)!));
+
+
+function displayDraftZone() {
+    console.log(`\nCurrent draft zone: ${game.state.draftZone.map(t => {
+        if (t.type === 'plant') {
+            return `${t.plant.name}`;
         }
-    }
-
-    return ungrown;
+        return t.type;
+    }).join(', ')}`);
 }
 
-// Try to grow plants in order of resource efficiency (cheapest first)
-function tryGrowAllPlants(game: SharedGardenGame): void {
-    const ungrownPlants = findUngrownPlants(game.state);
 
-    if (ungrownPlants.length === 0) return;
+// // Pick a random card from draft zone
+// const draftSize = game.state.draftZone.length;
+// if (draftSize > 0) {
+//     const pickIndex = Math.floor(Math.random() * draftSize);
+//     const tile = game.pickFromDraft(currentPlayer, pickIndex);
 
-    // Try to grow each plant
-    for (const { x, y, tile } of ungrownPlants) {
-        const grown = game.growPlant(x, y);
-        if (!grown) {
-            game.log(`🌿 Could not grow ${tile.plant.name} at (${x}, ${y}) due to resource limits.`);
-        }
-        // Continue trying other plants even if this one failed
-    }
-}
+//     if (tile) {
+//         // Find random empty cell in current player's garden
+//         const playerState = game.state.players.get(currentPlayer)!;
+//         const cell = findRandomEmptyCell(playerState.garden);
 
-// Map plant names to single characters
-const plantCharMap: Record<string, string> = {
-    Lavender: 'L',
-    Sunflower: 'S',
-    Mushroom: 'M',
-    Tree: 'T',
-    Daisy: 'D',
-};
+//         if (cell) {
+//             const [x, y] = cell;
+//             const placed = game.placeTile(currentPlayer, tile, x, y);
+//             if (!placed) {
+//                 console.log(`❌ Failed to place ${tile.type} at (${x}, ${y})`);
+//             }
+//         }
 
-// Generate a visual representation of the board
-function drawBoardInline(state: GameState): string[] {
-    const lines: string[] = [];
+//         // Try to grow an ungrown plant (random)
+//         const x = Math.floor(Math.random() * 5);
+//         const y = Math.floor(Math.random() * 5);
+//         game.growPlant(currentPlayer, x, y);
+//     }
+// }
 
-    // Resources bar
-    const { water, light, compost } = state.resources;
-    lines.push(
-        `Resources — 💧: ${water}  ☀️: ${light}  🌾: ${compost} | Turn: ${state.turn} | Score: ${state.score} | Infestations: ${state.infestation}`
-    );
+// // Display all player boards
+// console.log('\nCurrent Game State:');
+// for (const [playerId, playerState] of game.state.players) {
+//     console.log('\n' + drawPlayerBoard(playerState).join('\n'));
+// }
 
-    lines.push('   A  B  C  D  E'); // Column headers
+// // Display draft zone
+// console.log('\nDraft Zone:', game.state.draftZone.map(t =>
+//     t.type === 'plant' ? t.plant.name : t.type
+// ).join(', '));
 
-    for (let y = 0; y < state.grid.length; y++) {
-        let row = `${y + 1} `;
-        for (let x = 0; x < state.grid[y].length; x++) {
-            const tile = state.grid[y][x];
-            row += getSymbol(tile) + ' ';
-        }
-        lines.push(row);
-    }
-
-    return lines;
-}
-
-// Returns a 2-character symbol for each tile
-function getSymbol(tile: Tile | null): string {
-    if (!tile) return ' .';
-
-    if (tile.type === 'compost') return ' C';
-    if (tile.type === 'pest') return ' X';
-
-    if (tile.type === 'plant') {
-        const symbol = plantCharMap[tile.plant.name] || '?';
-        return tile.grown ? ` ${symbol}` : ` ${symbol.toLowerCase()}`;
-    }
-
-    return '??'; // fallback
-}
-
-// Create game
-const game = new SharedGardenGame();
-
-console.log('🌱 Starting Shared Garden simulation...\n');
-
-// Game loop
-while (!game.isGameOver() && !game.isVictory()) {
-
-    game.log('\n')
-    game.gainRandomResource();
-
-    const tile = game.drawTile();
-    if (!tile) break;
-
-    const cell = findRandomEmptyCell(game.state.grid);
-    if (!cell) {
-        console.log('Garden is full!');
-        break;
-    }
-
-    const [x, y] = cell;
-
-    const placed = game.placeTile(tile, x, y);
-    if (!placed) {
-        game.log(`❌ Failed to place ${tile.type} at (${x}, ${y})`);
-    }
-
-    // Try to grow ALL ungrown plants on the board, not just the one we placed
-    tryGrowAllPlants(game);
-
-    // Add board snapshot to the log
-    const layout = drawBoardInline(game.state);
-    layout.forEach(line => game.log(line));
-
-    game.endTurn();
-}
-
-// Final state output
-console.log('\n🧾 Final Log:\n');
-console.log(game.state.log.join('\n'));
-
-console.log('\n📊 Final Score:', game.state.score);
-console.log('🐛 Infestations:', game.state.infestation);
-console.log('🔁 Turns:', game.state.turn - 1);
-
-if (game.isVictory()) {
-    console.log('\n🏆 You won the game!');
-} else {
-    console.log('\n💀 Game over.');
-}
+// game.nextTurn();
