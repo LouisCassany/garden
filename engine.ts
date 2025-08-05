@@ -17,7 +17,6 @@ interface MultiplayerGameState {
     players: Map<PlayerId, PlayerState>;
     deck: Tile[];
     draftZone: Tile[];
-    discardPile: Tile[];
     currentTurn: number;
     currentPlayer: PlayerId;
     log: string[];
@@ -56,7 +55,6 @@ type Grid = (Tile | null)[][]; // 5x5 grid
 export interface GameState {
     grid: Grid;
     deck: Tile[];
-    discardPile: Tile[];
     resources: Record<Resource, number>;
     infestation: number;
     score: number;
@@ -137,21 +135,27 @@ export class MultiplayerGardenGame {
             players,
             deck: this.generateDeck(playerIds.length),
             draftZone: [],
-            discardPile: [],
             currentTurn: 1,
             currentPlayer: playerIds[0],
             log: []
         };
 
         // Fill the draft zone with cards ensuring pest are not drawn first
-        for (let i = 0; i < DRAFT_SIZE; i++) {
-            if (!this.refillDraftZone()) {
-                // If a pest is drawn, refill the draft zone with a new tile
-                this.refillDraftZone();
+        while (this.state.draftZone.length < DRAFT_SIZE) {
+            const tile = this.drawTile();
+            if (tile) {
+                // If it's a pest, put it back in the deck, shuffle the deck and refill the draft zone
+                if (tile.type === 'pest') {
+                    this.state.deck.push(tile);
+                    this.shuffle(this.state.deck);
+                } else {
+                    this.state.draftZone.push(tile);
+                }
             }
         }
     }
 
+    // Init action
     private generateDeck(playerCount: number): Tile[] {
         const deck: Tile[] = [];
 
@@ -178,17 +182,7 @@ export class MultiplayerGardenGame {
         return this.shuffle(deck);
     }
 
-    refillDraftZone(): boolean {
-        // If we draw a pest, return false, otherwise return true
-        const tile = this.state.deck.pop()!;
-        if (tile.type === 'pest') {
-            this.log(`Pest revealed! All players must place it.`);
-            return false;
-        }
-        this.state.draftZone.push(tile);
-        return true;
-    }
-
+    // Player action
     pickFromDraft(playerId: PlayerId, tileIndex: number): Tile | null {
         if (playerId !== this.state.currentPlayer) return null;
         if (tileIndex < 0 || tileIndex >= this.state.draftZone.length) return null;
@@ -199,6 +193,34 @@ export class MultiplayerGardenGame {
         return tile;
     }
 
+    // Player action
+    growPlant(playerId: PlayerId, x: number, y: number): boolean {
+        const playerState = this.state.players.get(playerId);
+        if (!playerState) return false;
+
+        const tile = playerState.garden[y][x];
+        if (!this.isPlantTile(tile) || tile.grown) return false;
+
+        const cost = tile.plant.growthCost;
+        if (!this.hasResources(playerId, cost)) return false;
+
+        this.spendResources(playerId, cost);
+        tile.grown = true;
+
+        // Calculate points from base score + synergy bonus
+        const neighbors = this.getNeighbors(playerState.garden, x, y);
+        const bonus = tile.plant.synergy(neighbors);
+        const points = tile.plant.basePoints + bonus;
+
+        // Update player's score
+        playerState.score += points;
+
+        this.log(`Player ${playerId} grew ${tile.plant.name} at (${x}, ${y}) for ${points} points`);
+
+        return true;
+    }
+
+    // Player action
     placeTile(playerId: PlayerId, tile: Tile, x: number, y: number): boolean {
         const playerState = this.state.players.get(playerId);
         if (!playerState) return false;
@@ -240,16 +262,20 @@ export class MultiplayerGardenGame {
         return true;
     }
 
-    shuffle<T>(array: T[]): T[] {
-        return array.sort(() => Math.random() - 0.5);
+    // Game action
+    drawTile(): Tile | null {
+        if (this.state.deck.length === 0) return null;
+        return this.state.deck.pop() || null;
     }
 
+    // Game action
     private gainResource(playerId: PlayerId, type: Resource, amount: number): void {
         const playerState = this.state.players.get(playerId);
         if (!playerState) return;
         playerState.resources[type] = Math.min(MAX_RESOURCES, playerState.resources[type] + amount);
     }
 
+    // Game action
     private checkInfestation(playerId: PlayerId, x: number, y: number): void {
         const playerState = this.state.players.get(playerId);
         if (!playerState) return;
@@ -310,38 +336,16 @@ export class MultiplayerGardenGame {
         this.state.log.push(`[Turn ${this.state.currentTurn}] ${message}`);
     }
 
+    shuffle<T>(array: T[]): T[] {
+        return array.sort(() => Math.random() - 0.5);
+    }
+
     inBounds(x: number, y: number): boolean {
         return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
     }
 
     private isPlantTile(tile: Tile | null): tile is PlantTile {
         return tile !== null && tile.type === 'plant';
-    }
-
-    growPlant(playerId: PlayerId, x: number, y: number): boolean {
-        const playerState = this.state.players.get(playerId);
-        if (!playerState) return false;
-
-        const tile = playerState.garden[y][x];
-        if (!this.isPlantTile(tile) || tile.grown) return false;
-
-        const cost = tile.plant.growthCost;
-        if (!this.hasResources(playerId, cost)) return false;
-
-        this.spendResources(playerId, cost);
-        tile.grown = true;
-
-        // Calculate points from base score + synergy bonus
-        const neighbors = this.getNeighbors(playerState.garden, x, y);
-        const bonus = tile.plant.synergy(neighbors);
-        const points = tile.plant.basePoints + bonus;
-
-        // Update player's score
-        playerState.score += points;
-
-        this.log(`Player ${playerId} grew ${tile.plant.name} at (${x}, ${y}) for ${points} points`);
-
-        return true;
     }
 
     private hasResources(playerId: PlayerId, cost: Partial<Record<Resource, number>>): boolean {

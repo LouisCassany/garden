@@ -38,7 +38,6 @@ if (tile && pickedTile) {
 }
 console.log(drawPlayerBoard(game.state.players.get(currentPlayer)!));
 
-
 function displayDraftZone() {
     console.log(`\nCurrent draft zone: ${game.state.draftZone.map(t => {
         if (t.type === 'plant') {
