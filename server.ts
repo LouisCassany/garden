@@ -49,7 +49,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         }
         game = new MultiplayerGardenGame(playerIds, GAME_SETTINGS);
         broadcastGameState();
-        return Response.json({ message: "Game created", state: game.state });
+        return Response.json({ state: game.state });
     }
 
     if (method === "POST" && pathname === "/game/pick") {
@@ -73,7 +73,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         if (!success) return Response.json({ error: reason }, { status: 400 });
 
         broadcastGameState();
-        return Response.json({ success, state: game.state });
+        return Response.json({ state: game.state });
     }
 
     if (method === "POST" && pathname === "/game/grow") {
@@ -85,7 +85,7 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         if (!success) return Response.json({ error: reason }, { status: 400 });
 
         broadcastGameState();
-        return Response.json({ success, state: game.state });
+        return Response.json({ state: game.state });
     }
 
     if (method === "POST" && pathname === "/game/next-turn") {
