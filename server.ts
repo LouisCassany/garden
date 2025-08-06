@@ -71,24 +71,12 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         //     return Response.json({ state: game.state });
         // }
 
-        if (method === "POST" && pathname === "/game/pick") {
-            if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
-
-            const body = await json();
-            const { playerId, tileIndex } = body ?? {};
-            const { success: tile, reason } = game.pickFromDraft(playerId, tileIndex);
-            if (!tile) return Response.json({ error: reason }, { status: 400 });
-
-            broadcastGameState();
-            return Response.json({ tile, state: game.state });
-        }
-
         if (method === "POST" && pathname === "/game/place") {
             if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
 
             const body = await json();
-            const { playerId, tile, x, y } = body ?? {};
-            const { success, reason } = game.placeTile(playerId, tile as Tile, x, y);
+            const { playerId, tileIndex, x, y } = body ?? {};
+            const { success, reason } = game.placeTile(playerId, tileIndex, x, y);
             if (!success) return Response.json({ error: reason }, { status: 400 });
 
             broadcastGameState();

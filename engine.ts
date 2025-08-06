@@ -11,7 +11,6 @@ export interface PlayerState {
     score: number;
     resources: Record<Resource, number>;
     infestation: number;
-    canDraft: boolean
     canGrow: boolean;
     canPlace: boolean;
     pestToPlace: 0,
@@ -54,7 +53,7 @@ interface PestTile extends TileBase {
 
 export type Tile = PlantTile | CompostTile | PestTile;
 
-type Grid = (Tile | null)[][]; // 5x5 grid
+export type Grid = (Tile | null)[][]; // 5x5 grid
 
 export interface GameState {
     grid: Grid;
@@ -130,7 +129,6 @@ export class MultiplayerGardenGame {
                 score: 0,
                 resources: { water: 0, light: 0, compost: 0 },
                 infestation: 0,
-                canDraft: true,
                 canGrow: true,
                 canPlace: true,
                 pestToPlace: 0
@@ -190,22 +188,6 @@ export class MultiplayerGardenGame {
     }
 
     // Player action
-    pickFromDraft(playerId: PlayerId, tileIndex: number): Result<Tile | null> {
-        if (playerId !== this.state.currentPlayer) return { success: null, reason: 'Not your turn' };
-        const playerState = this.state.players[playerId];
-        if (!playerState) return { success: null, reason: 'Player not found' };
-        if (!playerState.canDraft) return { success: null, reason: 'Cannot draft this turn' };
-
-        if (tileIndex < 0 || tileIndex >= this.state.draftZone.length) return { success: null, reason: 'Invalid tile index' };
-
-        const tile = this.state.draftZone[tileIndex];
-        this.state.draftZone.splice(tileIndex, 1);
-        this.log(`Player ${playerId} picked ${tile.type === 'plant' ? tile.plant.name : tile.type}`);
-        playerState.canDraft = false; // Disable drafting for this player
-        return { success: tile, reason: undefined };
-    }
-
-    // Player action
     growPlant(playerId: PlayerId, x: number, y: number): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
@@ -236,13 +218,17 @@ export class MultiplayerGardenGame {
     }
 
     // Player action
-    placeTile(playerId: PlayerId, tile: Tile, x: number, y: number): Result<boolean> {
+    placeTile(playerId: PlayerId, tileIndex: number, x: number, y: number): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
         if (!playerState) return { success: false, reason: 'Player not found' };
         if (!playerState.canPlace) return { success: false, reason: 'Cannot place tile this turn' };
-
         if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
+
+        // Select the tile from the draft zone
+        const tile = this.state.draftZone[tileIndex];
+        if (!tile) return { success: false, reason: 'Invalid tile index' };
+
         const existing = playerState.garden[y][x];
 
         if (tile.type === 'pest') {
@@ -278,6 +264,8 @@ export class MultiplayerGardenGame {
         }
 
         playerState.canPlace = false;
+        this.state.draftZone.splice(tileIndex, 1);
+        this.log(`Player ${playerId} picked ${tile.type === 'plant' ? tile.plant.name : tile.type}`);
         return { success: true, reason: undefined };
     }
 
@@ -325,7 +313,6 @@ export class MultiplayerGardenGame {
 
         // New turn setup
         this.state.currentPlayer = playerIds[nextIndex];
-        this.state.players[this.state.currentPlayer].canDraft = true;
         this.state.players[this.state.currentPlayer].canGrow = true;
         this.state.players[this.state.currentPlayer].canPlace = true;
         this.state.players[this.state.currentPlayer].pestToPlace = 0;
