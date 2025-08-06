@@ -1,134 +1,89 @@
-# 🌱 Shared Garden  
-*A cozy 2-player cooperative tile-placement game about growing a thriving garden together.*
+# 🌱 Garden Game Rules
+*A competitive tile-placement game for 2+ players about cultivating the most valuable garden.*
 
 ---
 
 ## 🎯 Objective
 
-Work together to grow plants in a shared 5x5 garden grid. You win by reaching **20 garden points** before:
-- The **tile deck runs out**, or  
-- You suffer **3 pest infestations**.
+Compete against other players to achieve the highest score by strategically growing a personal garden. The game ends when the deck runs out, a player's garden is full, or a player reaches the maximum infestation limit. The player with the highest score wins.
 
 ---
 
 ## 🧩 Components
 
-- **1 Garden Grid**: 5x5 squares (initially empty)  
-- **30 Garden Tiles**, shuffled as a deck:
-  - 20 Plant Tiles  
-  - 5 Compost Tiles  
-  - 5 Pest Tiles  
-- **Resource Tokens** (shared):
-  - 💧 Water (max 5)  
-  - ☀️ Light (max 5)  
-  - 🌾 Compost (max 5)  
-- **Infestation Counter**: starts at 0, game over at 3  
-- **Score Tracker**: starts at 0, win at 20  
+- **Player Boards**: Each player has their own personal garden grid (e.g., 5x5).
+- **Garden Tiles**: A shared deck of tiles, with quantities scaling based on the number of players.
+  - **Plant Tiles**: Various plants with different costs, points, and synergies.
+  - **Compost Tiles**
+  - **Pest Tiles**
+- **Draft Zone**: A public area where tiles are drawn to be picked by players.
+
+---
+
+## Player State
+
+Each player individually tracks:
+- **Garden Grid**: Your personal 5x5 board.
+- **Score**: Your current point total.
+- **Resources**: Your private pool of 💧 Water, ☀️ Light, and 🌾 Compost.
+- **Infestation Level**: Your personal count of pest infestations.
 
 ---
 
 ## 🔁 Turn Structure
 
-Players alternate turns. On **your turn**, do the following steps in order:
+Players take turns in a clockwise order. On your turn, you may perform **each of the following actions once**:
 
-1. **Draw 1 Tile** from the deck and reveal it  
-2. **Place the Tile** on an empty space on the garden grid  
-   - Placement must follow tile-specific rules  
-3. **Spend Resources** (optional) to grow 1 or more plants  
-4. **Gain 1 Random Resource** at the end of your turn  
-5. **Check for Pest Effects** (if a pest tile is present)
+1.  **Pick a Tile**: Choose one tile from the public **Draft Zone**.
+2.  **Place a Tile**: Place a tile from your hand onto an empty space in your garden.
+3.  **Grow a Plant**: Spend resources to grow a plant already on your grid to score points.
 
----
+After you have completed your actions, your turn ends. The turn passes to the next player, and the Draft Zone is replenished from the deck.
 
-## 🪴 Tile Types
-
-### 1. Plant Tiles  
-Each plant tile has:
-- A **name**  
-- A **growth cost** (combination of 💧, ☀️, 🌾)  
-- A **base score** when grown (1–3 points)  
-- A **synergy bonus** if placed next to specific tiles  
-
-**Example Plants:**
-
-| Plant       | Growth Cost     | Points | Synergy Effect                            |
-|-------------|-----------------|--------|--------------------------------------------|
-| 🪻 Lavender  | 1💧 + 1☀️       | 2      | +1 pt if next to another Flower            |
-| 🌻 Sunflower | 2☀️             | 2      | +1 pt if next to Compost                   |
-| 🍄 Mushroom  | 2🌾             | 1      | Doubles score if next to a Tree            |
-| 🌳 Tree      | 2💧 + 2🌾       | 3      | No synergy                                 |
-| 🌼 Daisy     | 1💧 + 1☀️       | 1      | +1 pt if next to another Plant (any kind)  |
-
-- When grown, a plant becomes permanent and scores its full value.  
-- A plant must be grown before it can provide synergy to others.
+### Replenishing the Draft Zone
+At the end of a turn, a new tile is drawn from the deck to refill the Draft Zone. If the drawn tile is a **Pest**, a "Pest Alert" is triggered:
+- Every player receives a `pestToPlace` token, forcing them to place a Pest tile on a future turn.
+- Another tile is drawn until a non-Pest tile is found to add to the Draft Zone.
 
 ---
 
-### 2. Compost Tiles  
-- Provides **1🌾** immediately (added to resource pool)  
-- Can be placed anywhere  
-- No scoring or synergy effect  
+## 🪴 Tile Types & Actions
+
+### 1. Plant Tiles
+Each plant has a name, growth cost, base point value, and a special synergy.
+
+| Plant | Growth Cost | Points | Synergy Effect |
+|---|---|---|---|
+| 🪻 Lavender | 1💧 + 1☀️ | 2 | +1 pt for each adjacent plant of a *different* type. |
+| 🌻 Sunflower | 2☀️ | 2 | +1 pt if next to any Compost tile. |
+| 🍄 Mushroom | 2🌾 | 1 | +1 pt if next to a Tree. |
+| 🌳 Tree | 2💧 + 2🌾 | 3 | No synergy. |
+| 🌼 Daisy | 1💧 + 1☀️ | 1 | +1 pt if next to any other plant. |
+
+- **Placing a Plant**: Must be on an empty square. It is initially "ungrown."
+- **Growing a Plant**: Pay its resource cost. The plant is now "grown," and you immediately score its base points plus any synergy bonuses from adjacent tiles.
+
+### 2. Compost Tiles
+- **Placing a Compost Tile**: Must be on an empty square. When placed, you immediately gain **1🌾 resource**.
+
+### 3. Pest Tiles
+- **Placing a Pest Tile**:
+  - Cannot be placed on a Compost or another Pest tile.
+  - If placed on a **Plant tile** (whether grown or ungrown), the plant is destroyed, and you **lose that plant's base points** from your score.
+  - If placed on an empty square, it has no effect on your score.
+- **Infestation**: If a newly placed Pest is adjacent (not diagonally) to another Pest on your board, your personal **Infestation Counter increases by 1**.
 
 ---
 
-### 3. Pest Tiles  
-- Can be placed on **any tile or empty space**.  
-- If placed on an **ungrown Plant**, that plant is **destroyed**.  
-- If a newly placed Pest is **adjacent to another Pest**, increase the **Infestation Counter** by 1.  
-- Max infestation: 3 → **Game Over**  
+## ✅ Game End
+
+The game ends for all players immediately when **any** of the following conditions are met:
+1.  The shared **tile deck runs out**.
+2.  A player reaches the **maximum infestation limit**.
+3.  A player's **garden grid is completely full**.
 
 ---
 
-## ⚙️ Resource System
+## 🏆 Winning the Game
 
-- The **resource pool is shared** between players  
-- Max 5 of each type (💧, ☀️, 🌾)  
-- You may **spend resources** on your turn to grow any number of plants  
-- Grown plants **cannot be destroyed** by pests  
-
----
-
-## 🎲 Gaining Resources
-
-At the **end of your turn**, gain **1 random resource**:
-
-- Roll a 6-sided die (or simulate):  
-  - 1–2: gain 1💧  
-  - 3–4: gain 1☀️  
-  - 5–6: gain 1🌾  
-- If that resource is at max (5), you gain nothing that turn
-
----
-
-## 🧠 Strategy Tips
-
-- Grow plants quickly to protect them from pests  
-- Place synergistic plants near each other for bonus points  
-- Use Compost Tiles early to boost 🌾 supply  
-- Watch the Pest tiles! Avoid placing plants in high-risk zones  
-
----
-
-## ✅ Win Condition
-
-- The players win immediately when the garden reaches **20 points**.
-
----
-
-## ❌ Lose Conditions
-
-You lose the game if **any** of the following occur:
-
-1. The **deck is empty** and you have **fewer than 20 points**  
-2. You reach **3 Pest Infestations**  
-3. The garden grid is full and **no further tiles can be placed**
-
----
-
-## 🛠 Optional Variants
-
-- **Solo Mode**: Play with one player, taking both turns  
-- **Advanced Plants**: Introduce rare plants with special powers  
-- **Garden Events**: Add weather or animal event cards each turn
-
----
+Once the game ends, the player with the **highest score** is declared the winner.
