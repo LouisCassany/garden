@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "npm:create-vite@*": "7.0.3",
     "npm:express@*": "5.1.0"
   },
   "npm": {
@@ -56,6 +57,10 @@
     },
     "cookie@0.7.2": {
       "integrity": "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w=="
+    },
+    "create-vite@7.0.3": {
+      "integrity": "sha512-niYruV/b9SNhxl+6YKt/tWXjb0H7I7TA9y6vE+tbCIn4aqQQnW4XDedTJv3otq9EjjJiCnxC8fBRnmxTlKCKKQ==",
+      "bin": true
     },
     "debug@4.4.1": {
       "integrity": "sha512-KcKCqiftBJcZr++7ykoDIEwSa3XWowTfNPo92BYxjXiyYEVrUQh2aLyhxBCwww+heortUFxEJYcRzosstTEBYQ==",
