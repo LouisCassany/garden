@@ -1,5 +1,5 @@
 // server.ts
-import { MultiplayerGardenGame, Tile } from "./engine.ts";
+import { MultiplayerGardenGame, Command } from "./engine.ts";
 
 const GAME_SETTINGS = {
     GRID_SIZE: 5,
@@ -51,73 +51,42 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
         return response;
     }
 
-    const json = async () => {
+    if (method === "POST" && pathname === "/cmd") {
         try {
-            return await req.json();
-        } catch {
-            return null;
+            const command: Command = await req.json();
+            const method = command.type;
+            const args = command.args;
+
+            if (typeof (game as any)[method] !== "function") {
+                return new Response(`Unknown command: ${method}`, { status: 400 });
+            }
+
+            const result = (game as any)[method](...args);
+            // return json(result);
+            return addCorsHeaders(new Response(JSON.stringify(result), {
+                headers: { "Content-Type": "application/json" },
+            }));
+        } catch (err) {
+            //@ts-ignore <err: unknown>
+
+            return addCorsHeaders(new Response("Invalid request: " + err.message, { status: 400 }));
         }
-    };
+    } else {
+        return addCorsHeaders(new Response("Not found", { status: 404 }));
+    }
+});
 
-    const handleRequest = async () => {
-        // if (method === "POST" && pathname === "/game/new") {
-        //     const body = await json();
-        //     const { playerIds } = body ?? {};
-        //     if (!Array.isArray(playerIds) || playerIds.length < 2) {
-        //         return Response.json({ error: "Need at least 2 player IDs" }, { status: 400 });
-        //     }
-        //     game = new MultiplayerGardenGame(playerIds, GAME_SETTINGS);
-        //     broadcastGameState();
-        //     return Response.json({ state: game.state });
-        // }
-
-        if (method === "POST" && pathname === "/game/place") {
-            if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
-
-            const body = await json();
-            const { playerId, tileIndex, x, y } = body ?? {};
-            const { success, reason } = game.placeTile(playerId, tileIndex, x, y);
-            if (!success) return Response.json({ error: reason }, { status: 400 });
-
-            broadcastGameState();
-            return Response.json({ state: game.state });
-        }
-
-        if (method === "POST" && pathname === "/game/grow") {
-            if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
-
-            const body = await json();
-            const { playerId, x, y } = body ?? {};
-            const { success, reason } = game.growPlant(playerId, x, y);
-            if (!success) return Response.json({ error: reason }, { status: 400 });
-
-            broadcastGameState();
-            return Response.json({ state: game.state });
-        }
-
-        if (method === "POST" && pathname === "/game/next-turn") {
-            if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
-
-            const isGameOver = game.nextTurn();
-            const winner = isGameOver ? game.getWinner() : undefined;
-
-            broadcastGameState();
-            return Response.json({ isGameOver, winner, state: game.state });
-        }
-
-        if (method === "GET" && pathname === "/game/state") {
-            if (!game) return Response.json({ error: "No game in progress" }, { status: 400 });
-            return Response.json({ state: game.state });
-        }
-
-        return new Response("Not found", { status: 404 });
-    };
-
-    const response = await handleRequest();
+function addCorsHeaders(response: Response): Response {
     for (const [key, value] of Object.entries(corsHeaders)) {
         response.headers.set(key, value);
     }
     return response;
-});
+}
+
+function json(data: unknown): Response {
+    return new Response(JSON.stringify(data), {
+        headers: { "Content-Type": "application/json" },
+    });
+}
 
 console.log("🟢 Server running at http://localhost:3000");

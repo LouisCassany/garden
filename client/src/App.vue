@@ -28,7 +28,7 @@
 
 <script lang=ts setup>
 import { ref } from "vue";
-import { type MultiplayerGameState, type Tile, type Grid } from "../../engine.ts";
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.ts";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
@@ -56,18 +56,6 @@ async function placeTile(x: number, y: number) {
   if (!state.value) return;
   const tileIndex = state.value.draftZone.indexOf(selectedTile.value)
 
-  // Post request to server
-  const response = await fetch('http://localhost:3000/game/place', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ playerId: "louis", x, y, tileIndex: tileIndex })
-  })
-
-  if (!response.ok) {
-    const body = await response.json();
-    console.log("Error placing tile:", body.error);
-  }
+  const res = await sendCommand("nextTurn", undefined)
 }
 </script>
