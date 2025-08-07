@@ -31,6 +31,7 @@ interface PlantData {
     basePoints: number;
     placeEffect: (playerState: PlayerState) => void;
     growEffect: (neighbors: Tile[], playerState: PlayerState) => void;
+    effect: string
     description: string;
 }
 
@@ -130,7 +131,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Lavender thrives near other plants, but not near Lavender itself. (+1 point for each different plant neighbor)',
+        description: 'Lavender thrives near other plants, but not near Lavender itself.',
+        effect: '+1 point for each different plant neighbor',
     },
     {
         name: 'Sunflower',
@@ -144,7 +146,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Sunflower loves compost. (+1 point for each compost neighbor)',
+        description: 'Sunflower loves compost.',
+        effect: '+1 point for each compost neighbor',
     },
     {
         name: 'Mushroom',
@@ -157,7 +160,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Mushrooms grow well near trees. (+1 point for each Tree neighbor)',
+        effect: '+1 point for each Tree neighbor',
+        description: 'Mushrooms grow well near trees.',
     },
     {
         name: 'Tree',
@@ -166,6 +170,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         growEffect: () => { },
         description: 'Trees are strong but require more resources.',
+        effect: ""
     },
     {
         name: 'Daisy',
@@ -178,7 +183,9 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Daisies love being around other plants. (+1 point for each plant neighbor)',
+        description: 'Daisies love being around other plants.',
+        effect: '+1 point for each plant neighbor',
+
     },
     {
         name: 'Compost',
@@ -188,7 +195,8 @@ const plantLibrary: PlantData[] = [
         placeEffect: (playerState) => {
             playerState.resources.compost += 1;
         },
-        description: 'Compost is a nutritious resource that can be used to grow plants. (+1 one compost resource)',
+        description: 'Compost is a nutritious resource that can be used to grow plants.',
+        effect: '+1 compost resource',
     },
     {
         name: 'Brook',
@@ -198,7 +206,8 @@ const plantLibrary: PlantData[] = [
         placeEffect: (playerState) => {
             playerState.resources.water += 2;
         },
-        description: 'Brooks are a source of water. (+1 water resource)',
+        description: 'Brooks are a source of water.',
+        effect: '+2 water resources',
     },
     {
         name: 'Cactus',
@@ -211,7 +220,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Cactus thrives in isolation. (+1 point for each empty adjacent space)',
+        description: 'Cactus thrives in isolation.',
+        effect: '+1 point for each empty adjacent space',
     },
     {
         name: 'Bamboo',
@@ -226,7 +236,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Bamboo grows in clusters. (+2 points for each adjacent Bamboo)',
+        description: 'Bamboo grows in clusters.',
+        effect: '+2 points for each adjacent Bamboo',
     },
     {
         name: 'Vine',
@@ -241,7 +252,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Vines benefit from grown plants. (+1 point for each grown neighbor)',
+        description: 'Vines benefit from grown plants.',
+        effect: '+1 point for each grown neighbor',
     },
     {
         name: 'Fern',
@@ -256,7 +268,8 @@ const plantLibrary: PlantData[] = [
             }
         },
         placeEffect: () => { },
-        description: 'Ferns grow in tree shade. (+1 light resource when next to a Tree)',
+        description: 'Ferns grow in tree shade. ',
+        effect: "+1 light resource when next to a Tree"
     },
 ];
 

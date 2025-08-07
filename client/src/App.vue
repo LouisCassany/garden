@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col w-full h-screen p-4 gap-4 lg:px-48" v-if="state" data-theme="dark">
+  <div class="flex flex-col w-full h-screen p-4 gap-4 px-72" v-if="state" data-theme="dark">
     <div class="flex w-full text-xl justify-center font-mono">
       Current player: <span class="font-bold"> {{ state.currentPlayer }}</span>
     </div>
@@ -7,23 +7,21 @@
       <h1 class="text-lg ">Ressources</h1>
       <div class="grid grid-cols-6 w-full border-primary border rounded-md p-2">
         <span>⭐️: {{ state.players[playerId].score }}</span>
-        <span>🐀: {{ state.players[playerId].pestToPlace }}</span>
         <span>💧: {{ state.players[playerId].resources.water }}</span>
         <span>☀️: {{ state.players[playerId].resources.light }}</span>
         <span>🌾: {{ state.players[playerId].resources.compost }}</span>
+        <span>🐀: {{ state.players[playerId].pestToPlace }}</span>
         <span>💣: {{ state.players[playerId].infestation }}</span>
       </div>
     </div>
     <div class="flex flex-col gap-2">
       <h1 class="text-lg ">Draft zone</h1>
-      <div class="grid grid-cols-4 gap-2 w-full border-primary border rounded-md p-2">
+      <div class="grid grid-cols-5 gap-2 w-full border-primary border rounded-md p-2">
         <label v-for="tile in state.draftZone" :key="tile.id"
-          class="flex flex-col items-center cursor-pointer p-2 gap-2 w-full aspect-square">
+          class="flex flex-col items-center cursor-pointer p-2 gap-2">
           <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
             :disabled="playerId !== state.currentPlayer" />
-          <div class="w-full h-[calc(100%-2rem)]">
-            <TileCard :tile="tile as PlantTile" />
-          </div>
+          <TileCard :tile="tile" />
         </label>
       </div>
     </div>
@@ -32,12 +30,11 @@
       <h1 class="text-lg ">Garden</h1>
       <div class="grid grid-cols-5 gap-2 w-full border-primary border rounded-md p-2">
         <div
-          class="aspect-square w-full flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
+          class="aspect-square flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
           v-for="(tile, index) in flattenGarden(state.players[playerId].garden)"
           @click="placeTile(index % 5, Math.floor(index / 5))">
-          <div class="w-full h-full">
-            <TileCard v-if="tile" :tile="tile as PlantTile" />
-          </div>
+          <TileCard v-if="tile" :tile="tile" />
+          <div v-else>.</div>
         </div>
       </div>
     </div>

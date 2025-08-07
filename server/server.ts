@@ -13,7 +13,7 @@ const GAME_SETTINGS = {
     GRID_SIZE: 5,
     MAX_RESOURCES: 5,
     MAX_INFESTATIONS: 3,
-    DRAFT_SIZE: 4,
+    DRAFT_SIZE: 5,
 };
 
 const game = new MultiplayerGardenGame(["louis", "melanie"], GAME_SETTINGS);

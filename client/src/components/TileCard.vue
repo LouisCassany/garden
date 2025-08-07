@@ -1,14 +1,17 @@
 <template>
-    <div class="w-full h-full p-2 bg-base-300 shadow-md border border-secondary rounded-md">
-        <div class="flex flex-col justify-between h-full gap-1">
-            <h5 class="card-title text-sm truncate">{{ tile.plant.name }}</h5>
-            <p class="card-text text-xs overflow-hidden flex-grow">{{ tile.plant.description }}</p>
-            <p class="card-text flex justify-between text-sm">
-                <span>⭐️{{ tile.plant.basePoints }}</span>
+    <div
+        class="aspect-square p-4 bg-base-300 shadow-md w-full h-full border border-secondary rounded-md flex flex-col justify-between">
+        <div class="flex w-full justify-between">
+            <h5 class="card-title">{{ tile.plant.name }}</h5>
+            <span>⭐️{{ tile.plant.basePoints }}</span>
+        </div>
+        <div class="flex flex-col gap-2 my-auto">
+            <p class="card-text flex justify-between" v-if="canGrow(tile)">
                 <span>💧{{ tile.plant.growthCost.water ?? 0 }}</span>
                 <span>☀️{{ tile.plant.growthCost.light ?? 0 }}</span>
                 <span>🌾{{ tile.plant.growthCost.compost ?? 0 }}</span>
             </p>
+            <p class="card-text text-xs">{{ tile.plant.effect }}</p>
         </div>
     </div>
 </template>
@@ -19,4 +22,8 @@ import { type PlantTile } from '../../../engine.ts'
 defineProps<{
     tile: PlantTile
 }>()
+
+function canGrow(tile: PlantTile) {
+    return tile.plant.growthCost.water !== undefined || tile.plant.growthCost.light !== undefined || tile.plant.growthCost.compost !== undefined;
+}
 </script>
