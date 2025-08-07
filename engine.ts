@@ -82,7 +82,7 @@ interface GameCommands {
         return: ReturnType<MultiplayerGardenGame["placeTile"]>;
     };
     nextTurn: {
-        args: [];
+        args: Parameters<MultiplayerGardenGame["nextTurn"]>;
         return: ReturnType<MultiplayerGardenGame["nextTurn"]>;
     };
 }
@@ -449,7 +449,9 @@ export class MultiplayerGardenGame {
             .filter(Boolean) as Tile[];
     }
 
-    nextTurn(): boolean {
+    nextTurn({ playerId }: { playerId: PlayerId }): Result<boolean> {
+        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+
         const playerIds = Object.keys(this.state.players);
         const currentIndex = playerIds.indexOf(this.state.currentPlayer);
         const nextIndex = (currentIndex + 1) % playerIds.length;
@@ -458,11 +460,17 @@ export class MultiplayerGardenGame {
             this.state.currentTurn++;
         }
 
-        // New turn setup
+        // Make the current player gain 1 random resource
+        const currentPlayer = this.state.players[this.state.currentPlayer];
+        this.gainRandomResource(this.state.currentPlayer);
+
+        // Reset the current player's canGrow and canPlace
+        currentPlayer.canGrow = true;
+        currentPlayer.canPlace = true;
+        currentPlayer.pestToPlace = 0;
+
+        // Set the next player as current
         this.state.currentPlayer = playerIds[nextIndex];
-        this.state.players[this.state.currentPlayer].canGrow = true;
-        this.state.players[this.state.currentPlayer].canPlace = true;
-        this.state.players[this.state.currentPlayer].pestToPlace = 0;
 
         // Draw a new tile and while we draw pest tiles, count them
         let newCard = this.drawTile();
@@ -477,8 +485,7 @@ export class MultiplayerGardenGame {
         if (newCard) {
             this.state.draftZone.push(newCard);
         }
-
-        return this.isGameOver();
+        return { success: true };
     }
 
     isGameOver(): boolean {
@@ -521,6 +528,13 @@ export class MultiplayerGardenGame {
 
     private isPlantTile(tile: Tile | null): tile is PlantTile {
         return tile !== null && tile.type === 'plant';
+    }
+
+    private gainRandomResource(playerId: PlayerId) {
+        const resources: Resource[] = ['water', 'light', 'compost'];
+        const randomIndex = Math.floor(Math.random() * resources.length);
+        const randomResource = resources[randomIndex];
+        this.gainResource(playerId, randomResource, 1);
     }
 
     private hasResources(playerId: PlayerId, cost: Partial<Record<Resource, number>>): boolean {

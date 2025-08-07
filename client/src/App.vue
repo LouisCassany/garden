@@ -3,15 +3,18 @@
     <div class="flex w-full text-xl justify-center font-mono">
       Current player: <span class="font-bold"> {{ state.currentPlayer }}</span>
     </div>
+    <button class="btn btn-primary" @click="endturn" :disabled="playerId !== state.currentPlayer">End turn</button>
     <div class="flex flex-col gap-2">
-      <h1 class="text-lg ">Ressources</h1>
+      <h1 class="text-lg">Ressources</h1>
       <div class="grid grid-cols-6 w-full border-primary border rounded-md p-2">
-        <span>⭐️: {{ state.players[playerId].score }}</span>
-        <span>💧: {{ state.players[playerId].resources.water }}</span>
-        <span>☀️: {{ state.players[playerId].resources.light }}</span>
-        <span>🌾: {{ state.players[playerId].resources.compost }}</span>
-        <span>🐀: {{ state.players[playerId].pestToPlace }}</span>
-        <span>💣: {{ state.players[playerId].infestation }}</span>
+        <div v-for="(resource, label) in resources" :key="label" class="resource-item">
+          <span class="resource-icon">{{ resource.icon }}</span>
+          <transition name="number">
+            <span :key="resource.value" class="resource-value">
+              {{ resource.value }}
+            </span>
+          </transition>
+        </div>
       </div>
     </div>
     <div class="flex flex-col gap-2">
@@ -39,15 +42,14 @@
       </div>
     </div>
 
-    <button class="btn btn-primary" @click="endturn">End turn</button>
   </div>
 </template>
 
-<script lang=ts setup>
-import { ref } from "vue";
+<script lang="ts" setup>
+import { ref, computed } from "vue";
 import TileCard from "./components/TileCard.vue";
 
-import { type MultiplayerGameState, type Tile, type Grid, sendCommand, type PlantTile } from "../../engine.js";
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.js";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
@@ -62,11 +64,6 @@ socket.onmessage = (event) => {
   state.value = data.state as MultiplayerGameState;
   selectedTile.value = state.value.draftZone[0];
 };
-
-function tileName(tile: Tile) {
-  if (tile.type === "pest") return "Pest";
-  if (tile.type === "plant") return tile.plant.name
-}
 
 function flattenGarden(garden: Grid): (Tile | null)[] {
   if (!garden) return [];
@@ -90,9 +87,100 @@ async function placeTile(x: number, y: number) {
 }
 
 async function endturn() {
-  const res = await sendCommand("nextTurn", undefined).catch((err) => {
+  const res = await sendCommand("nextTurn", { playerId }).catch((err) => {
     console.error("Error sending command:", err);
   });
-  if (res) console.log("End game triggered");
+
+  if (res && res.success) {
+    console.log("Turn ended successfully");
+  } else {
+    console.error("Failed to end turn:", res);
+  }
 }
+
+// Add this computed property
+const resources = computed(() => ({
+  score: {
+    icon: '⭐️',
+    value: state.value?.players[playerId].score
+  },
+  water: {
+    icon: '💧',
+    value: state.value?.players[playerId].resources.water
+  },
+  light: {
+    icon: '☀️',
+    value: state.value?.players[playerId].resources.light
+  },
+  compost: {
+    icon: '🌾',
+    value: state.value?.players[playerId].resources.compost
+  },
+  pest: {
+    icon: '🐀',
+    value: state.value?.players[playerId].pestToPlace
+  },
+  infestation: {
+    icon: '💣',
+    value: state.value?.players[playerId].infestation
+  },
+}));
 </script>
+
+<style scoped>
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  width: 4rem;
+}
+
+.resource-icon {
+  font-size: 1.2rem;
+}
+
+.resource-value {
+  position: absolute;
+  left: 2rem;
+  min-width: 2rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.number-enter-active {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.number-leave-active {
+  animation: bounce-out 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(2.5);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-out {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+</style>
