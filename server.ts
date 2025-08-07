@@ -23,6 +23,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // WebSocket route
+//@ts-ignore
 app.ws("/ws", (ws, _req) => {
     // Send initial state
     ws.send(JSON.stringify({ state: game.state }));
