@@ -1,6 +1,6 @@
 type Resource = 'water' | 'light' | 'compost';
 type TileType = 'plant' | 'pest';
-type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost';
+type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Brook' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
 type Result<T> = { success: T, reason?: string };
 
 export type PlayerId = string;
@@ -189,7 +189,75 @@ const plantLibrary: PlantData[] = [
             playerState.resources.compost += 1;
         },
         description: 'Compost is a nutritious resource that can be used to grow plants. (+1 one compost resource)',
-    }
+    },
+    {
+        name: 'Brook',
+        growthCost: {},
+        basePoints: 0,
+        growEffect: () => { },
+        placeEffect: (playerState) => {
+            playerState.resources.water += 2;
+        },
+        description: 'Brooks are a source of water. (+1 water resource)',
+    },
+    {
+        name: 'Cactus',
+        growthCost: { light: 2 },
+        basePoints: 1,
+        growEffect: (neighbors, playerState) => {
+            const emptySpaces = neighbors.filter(t => t === null).length;
+            if (emptySpaces > 0) {
+                playerState.score += emptySpaces;
+            }
+        },
+        placeEffect: () => { },
+        description: 'Cactus thrives in isolation. (+1 point for each empty adjacent space)',
+    },
+    {
+        name: 'Bamboo',
+        growthCost: { water: 1, compost: 1 },
+        basePoints: 2,
+        growEffect: (neighbors, playerState) => {
+            const bambooNeighbors = neighbors.filter(t =>
+                t?.type === 'plant' && t.plant.name === 'Bamboo'
+            ).length;
+            if (bambooNeighbors > 0) {
+                playerState.score += bambooNeighbors * 2;
+            }
+        },
+        placeEffect: () => { },
+        description: 'Bamboo grows in clusters. (+2 points for each adjacent Bamboo)',
+    },
+    {
+        name: 'Vine',
+        growthCost: { water: 1, light: 1 },
+        basePoints: 0,
+        growEffect: (neighbors, playerState) => {
+            const grownNeighbors = neighbors.filter(t =>
+                t?.type === 'plant' && t.grown
+            ).length;
+            if (grownNeighbors > 0) {
+                playerState.score += grownNeighbors;
+            }
+        },
+        placeEffect: () => { },
+        description: 'Vines benefit from grown plants. (+1 point for each grown neighbor)',
+    },
+    {
+        name: 'Fern',
+        growthCost: { water: 1 },
+        basePoints: 1,
+        growEffect: (neighbors, playerState) => {
+            const treeNeighbors = neighbors.some(t =>
+                t?.type === 'plant' && t.plant.name === 'Tree'
+            );
+            if (treeNeighbors) {
+                playerState.resources.light += 1;
+            }
+        },
+        placeEffect: () => { },
+        description: 'Ferns grow in tree shade. (+1 light resource when next to a Tree)',
+    },
 ];
 
 export class MultiplayerGardenGame {
@@ -265,8 +333,7 @@ export class MultiplayerGardenGame {
     growPlant({ playerId, x, y }: { playerId: PlayerId, x: number, y: number }): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
-        if (!playerState) return { success: false, reason: 'Player not found' };
-        if (!playerState.canGrow) return { success: false, reason: 'Cannot grow this turn' };
+        if (!playerState || !playerState.canGrow) return { success: false, reason: 'Cannot grow this turn' };
 
         const tile = playerState.garden[y][x];
         if (!this.isPlantTile(tile) || tile.grown) return { success: false, reason: 'Invalid tile to grow (not plant or already grown)' };
@@ -274,10 +341,11 @@ export class MultiplayerGardenGame {
         const cost = tile.plant.growthCost;
         if (!this.hasResources(playerId, cost)) return { success: false, reason: 'Not enough resources' };
 
+        // Spend the player resources
         this.spendResources(playerId, cost);
         tile.grown = true;
 
-        // trigger the plant's grow effect
+        // Trigger the plant's grow effect
         const neighbors = this.getNeighbors(playerState.garden, x, y);
         tile.plant.growEffect(neighbors, playerState);
 
@@ -291,8 +359,7 @@ export class MultiplayerGardenGame {
     placeTile({ playerId, tileIndex, x, y }: { playerId: PlayerId, tileIndex: number, x: number, y: number }): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
-        if (!playerState) return { success: false, reason: 'Player not found' };
-        if (!playerState.canPlace) return { success: false, reason: 'Cannot place tile this turn' };
+        if (!playerState || !playerState.canPlace) return { success: false, reason: 'Cannot place tile this turn' };
         if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
 
         // Select the tile from the draft zone

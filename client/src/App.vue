@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col w-full h-screen p-4 gap-4" v-if="state" data-theme="dark">
+  <div class="flex flex-col w-full h-screen p-4 gap-4 lg:px-48" v-if="state" data-theme="dark">
     <div class="flex w-full text-xl justify-center font-mono">
       Current player: <span class="font-bold"> {{ state.currentPlayer }}</span>
     </div>
@@ -16,12 +16,12 @@
     </div>
     <div class="flex flex-col gap-2">
       <h1 class="text-lg ">Draft zone</h1>
-      <div class="grid grid-rows-4 gap-2 w-full border-primary border rounded-md p-2">
+      <div class="grid grid-cols-4 gap-2 w-full border-primary border rounded-md p-2">
         <label v-for="tile in state.draftZone" :key="tile.id"
-          class="flex items-center border border-secondary rounded-md cursor-pointer p-2 gap-2">
+          class="flex flex-col items-center cursor-pointer p-2 gap-2">
           <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
             :disabled="playerId !== state.currentPlayer" />
-          {{ tileName(tile) }}
+          <TileCard :tile="tile as PlantTile" class="aspect-square" />
         </label>
       </div>
     </div>
@@ -33,7 +33,7 @@
           class="aspect-square w-full h-full flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
           v-for="(tile, index) in flattenGarden(state.players[playerId].garden)"
           @click="placeTile(index % 5, Math.floor(index / 5))">
-          {{ tile ? tileName(tile) : "." }}
+          <TileCard v-if="tile" :tile="tile as PlantTile" />
         </div>
       </div>
     </div>
@@ -44,7 +44,9 @@
 
 <script lang=ts setup>
 import { ref } from "vue";
-import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.js";
+import TileCard from "./components/TileCard.vue";
+
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand, type PlantTile } from "../../engine.js";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
@@ -61,7 +63,6 @@ socket.onmessage = (event) => {
 };
 
 function tileName(tile: Tile) {
-  if (tile.type === "compost") return "Compost";
   if (tile.type === "pest") return "Pest";
   if (tile.type === "plant") return tile.plant.name
 }
