@@ -25,7 +25,7 @@
           class="flex flex-col items-center cursor-pointer p-2 gap-2">
           <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
             :disabled="turnState !== 'PLACE'" />
-          <TileCard :tile="tile" />
+          <TileCard :tile="tile" :canBeGrown="false" />
         </label>
       </div>
     </div>
@@ -37,7 +37,7 @@
           class="aspect-square flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
           v-for="(tile, index) in flattenGarden(state.players[playerId].garden)"
           @click="placeTile(index % 5, Math.floor(index / 5))">
-          <TileCard v-if="tile" :tile="tile" />
+          <TileCard v-if="tile" :tile="tile" :canBeGrown="canBeGrown(tile)" />
           <div v-else>.</div>
         </div>
       </div>
@@ -50,7 +50,7 @@
 import { ref, computed } from "vue";
 import TileCard from "./components/TileCard.vue";
 
-import { type MultiplayerGameState, type Tile, type Grid, sendCommand, type PlantTile } from "../../engine.js";
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand, type PlantTile, type TurnState } from "../../engine.js";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
@@ -99,6 +99,17 @@ async function endturn() {
   }
 }
 
+function canBeGrown(tile: Tile): boolean {
+  if (!state.value) return false;
+  if (turnState.value !== 'GROW') return false;
+  if (!tile || tile.type !== 'plant') return false;
+  const ressourcesNeeded = tile.plant.growthCost;
+  if (ressourcesNeeded.water !== undefined && state.value.players[playerId].resources.water < ressourcesNeeded.water) return false;
+  if (ressourcesNeeded.light !== undefined && state.value.players[playerId].resources.light < ressourcesNeeded.light) return false;
+  if (ressourcesNeeded.compost !== undefined && state.value.players[playerId].resources.compost < ressourcesNeeded.compost) return false;
+  return true;
+}
+
 async function skipGrowPhase() {
   const res = await sendCommand("skipGrowPhase", { playerId }).catch((err) => {
     console.error("Error sending command:", err);
@@ -112,7 +123,7 @@ async function skipGrowPhase() {
 }
 
 const turnState = computed(() => {
-  if (!state.value) return "null";
+  if (!state.value) return null;
   return state.value.players[playerId].turnState;
 });
 

@@ -1,7 +1,7 @@
 type Resource = 'water' | 'light' | 'compost';
 type TileType = 'plant' | 'pest';
 type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Brook' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
-type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END';
+export type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END';
 type Result<T> = { success: T, reason?: string };
 
 export type PlayerId = string;

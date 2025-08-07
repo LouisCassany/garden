@@ -1,6 +1,10 @@
 <template>
     <div v-if="tile.type === 'plant'"
-        class="aspect-square p-4 bg-base-300 shadow-md w-full h-full border border-secondary rounded-md flex flex-col justify-between">
+        class="aspect-square p-4 shadow-md w-full h-full border border-secondary rounded-md flex flex-col justify-between"
+        :class="{
+            'bg-green-900': canBeGrown,
+            'bg-base-300': !canBeGrown,
+        }">
         <div class="flex w-full justify-between">
             <h5 class="card-title">{{ tile.plant.name }}</h5>
             <span>⭐️{{ tile.plant.basePoints }}</span>
@@ -27,6 +31,7 @@ import { type Tile, type PlantTile } from '../../../engine.ts'
 
 defineProps<{
     tile: Tile
+    canBeGrown: boolean
 }>()
 
 function canGrow(tile: PlantTile) {
