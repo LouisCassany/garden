@@ -1,5 +1,13 @@
-// server.ts
-import { MultiplayerGardenGame, Command } from "./engine.ts";
+import express from "express";
+import expressWs from "express-ws";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { MultiplayerGardenGame, Command } from "./engine";
+
+const app = express();
+expressWs(app); // Enable WebSocket support
+
+const PORT = 3000;
 
 const GAME_SETTINGS = {
     GRID_SIZE: 5,
@@ -11,81 +19,54 @@ const GAME_SETTINGS = {
 const game = new MultiplayerGardenGame(["louis", "melanie"], GAME_SETTINGS);
 const sockets = new Set<WebSocket>();
 
+app.use(cors());
+app.use(bodyParser.json());
+
+// WebSocket route
+app.ws("/ws", (ws, _req) => {
+    // Send initial state
+    ws.send(JSON.stringify({ state: game.state }));
+    sockets.add(ws as unknown as WebSocket);
+
+    ws.on("close", () => {
+        sockets.delete(ws as unknown as WebSocket);
+    });
+});
+
+// Broadcast function
 function broadcastGameState() {
-    if (!game) return;
     const message = JSON.stringify({ type: "update", state: game.state });
     console.log("Broadcasting game state to", sockets.size, "clients");
+
     for (const socket of sockets) {
-        if (socket.readyState === WebSocket.OPEN) {
+        if (socket.readyState === 1) { // 1 = OPEN
             socket.send(message);
         }
     }
 }
 
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-};
+// Command route
+app.post("/cmd", (req, res) => {
+    const command: Command = req.body;
 
-
-Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
-    if (req.method === "OPTIONS") {
-        return new Response(null, {
-            status: 204,
-            headers: corsHeaders,
-        });
+    if (typeof (game as any)[command.type] !== "function") {
+        return res.status(400).send(`Unknown command: ${command.type}`);
     }
 
-    const { pathname } = new URL(req.url);
-    const method = req.method;
-
-    // Handle WebSocket upgrade
-    if (pathname === "/ws") {
-        const { response, socket } = Deno.upgradeWebSocket(req);
-        socket.onopen = () => {
-            // Send initial game state to the new client
-            socket.send(JSON.stringify({ state: game.state }));
-        }
-        sockets.add(socket);
-        return response;
-    }
-
-    if (method === "POST" && pathname === "/cmd") {
-        try {
-            const command: Command = await req.json();
-            const method = command.type;
-            const args = command.args;
-
-            if (typeof (game as any)[method] !== "function") {
-                return new Response(`Unknown command: ${method}`, { status: 400 });
-            }
-
-            const result = (game as any)[method](...args);
-            broadcastGameState()
-            return addCorsHeaders(new Response(JSON.stringify(result), {
-                headers: { "Content-Type": "application/json" },
-            }));
-        } catch (err) {
-            //@ts-ignore <err: unknown>
-            return addCorsHeaders(new Response("Invalid request: " + err.message, { status: 400 }));
-        }
-    } else {
-        return addCorsHeaders(new Response("Not found", { status: 404 }));
+    try {
+        const result = (game as any)[command.type](...command.args);
+        broadcastGameState();
+        res.json(result);
+    } catch (err: any) {
+        res.status(400).send("Invalid request: " + err.message);
     }
 });
 
-function addCorsHeaders(response: Response): Response {
-    for (const [key, value] of Object.entries(corsHeaders)) {
-        response.headers.set(key, value);
-    }
-    return response;
-}
+// Fallback route
+app.use((_, res) => {
+    res.status(404).send("Not found");
+});
 
-function json(data: unknown): Response {
-    return new Response(JSON.stringify(data), {
-        headers: { "Content-Type": "application/json" },
-    });
-}
-
-console.log("🟢 Server running at http://localhost:3000");
+app.listen(PORT, () => {
+    console.log(`🟢 Server running at http://localhost:${PORT}`);
+});

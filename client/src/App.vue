@@ -1,12 +1,26 @@
 <template>
-  <div class="flew w-full h-screen p-4" v-if="state" data-theme="dark">
-    Current player: {{ state.currentPlayer }}
+  <div class="flex flex-col w-full h-screen p-4 gap-4" v-if="state" data-theme="dark">
+    <div class="flex w-full text-xl justify-center font-mono">
+      Current player: <span class="font-bold"> {{ state.currentPlayer }}</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h1 class="text-lg ">Ressources</h1>
+      <div class="grid grid-cols-5 w-full border-primary border rounded-md p-2">
+        <span>⭐️: {{ state.players[playerId].score }}</span>
+        <span>🐀: {{ state.players[playerId].pestToPlace }}</span>
+        <span>💧: {{ state.players[playerId].resources.water }}</span>
+        <span>☀️: {{ state.players[playerId].resources.light }}</span>
+        <span>🌾: {{ state.players[playerId].resources.compost }}</span>
+        <span>💣: {{ state.players[playerId].infestation }}</span>
+      </div>
+    </div>
     <div class="flex flex-col gap-2">
       <h1 class="text-lg ">Draft zone</h1>
       <div class="grid grid-rows-4 gap-2 w-full border-primary border rounded-md p-2">
         <label v-for="tile in state.draftZone" :key="tile.id"
           class="flex items-center border border-secondary rounded-md cursor-pointer p-2 gap-2">
-          <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile" />
+          <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
+            :disabled="playerId !== state.currentPlayer" />
           {{ tileName(tile) }}
         </label>
       </div>
@@ -30,7 +44,7 @@
 
 <script lang=ts setup>
 import { ref } from "vue";
-import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.ts";
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.js";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
