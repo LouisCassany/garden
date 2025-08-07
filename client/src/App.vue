@@ -17,12 +17,14 @@
       <div class="grid grid-cols-5 gap-2 w-full border-primary border rounded-md p-2">
         <div
           class="aspect-square w-full h-full flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
-          v-for="(tile, index) in flattenGarden(state.players[state.currentPlayer].garden)"
+          v-for="(tile, index) in flattenGarden(state.players[playerId].garden)"
           @click="placeTile(index % 5, Math.floor(index / 5))">
           {{ tile ? tileName(tile) : "." }}
         </div>
       </div>
     </div>
+
+    <button class="btn btn-primary" @click="endturn">End turn</button>
   </div>
 </template>
 
@@ -33,6 +35,10 @@ import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "..
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
 const selectedTile = ref<Tile | null>(null);
+
+// Get current palyer name from query parameters
+const urlParams = new URLSearchParams(window.location.search);
+const playerId = urlParams.get('playerId') as string;
 
 socket.onmessage = (event) => {
   const data = JSON.parse(event.data);
@@ -56,6 +62,21 @@ async function placeTile(x: number, y: number) {
   if (!state.value) return;
   const tileIndex = state.value.draftZone.indexOf(selectedTile.value)
 
-  const res = await sendCommand("nextTurn", undefined)
+  const res = await sendCommand("placeTile", { playerId, tileIndex, x, y }).catch((err) => {
+    console.error("Error sending command:", err);
+  });
+
+  if (res && res.success) {
+    console.log("Tile placed successfully");
+  } else {
+    console.error("Failed to place tile:", res);
+  }
+}
+
+async function endturn() {
+  const res = await sendCommand("nextTurn", undefined).catch((err) => {
+    console.error("Error sending command:", err);
+  });
+  if (res) console.log("End game triggered");
 }
 </script>

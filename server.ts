@@ -62,13 +62,12 @@ Deno.serve({ port: 3000 }, async (req: Request): Promise<Response> => {
             }
 
             const result = (game as any)[method](...args);
-            // return json(result);
+            broadcastGameState()
             return addCorsHeaders(new Response(JSON.stringify(result), {
                 headers: { "Content-Type": "application/json" },
             }));
         } catch (err) {
             //@ts-ignore <err: unknown>
-
             return addCorsHeaders(new Response("Invalid request: " + err.message, { status: 400 }));
         }
     } else {
