@@ -5,7 +5,7 @@
     </div>
     <div class="flex flex-col gap-2">
       <h1 class="text-lg ">Ressources</h1>
-      <div class="grid grid-cols-5 w-full border-primary border rounded-md p-2">
+      <div class="grid grid-cols-6 w-full border-primary border rounded-md p-2">
         <span>⭐️: {{ state.players[playerId].score }}</span>
         <span>🐀: {{ state.players[playerId].pestToPlace }}</span>
         <span>💧: {{ state.players[playerId].resources.water }}</span>
@@ -18,10 +18,12 @@
       <h1 class="text-lg ">Draft zone</h1>
       <div class="grid grid-cols-4 gap-2 w-full border-primary border rounded-md p-2">
         <label v-for="tile in state.draftZone" :key="tile.id"
-          class="flex flex-col items-center cursor-pointer p-2 gap-2">
+          class="flex flex-col items-center cursor-pointer p-2 gap-2 w-full aspect-square">
           <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
             :disabled="playerId !== state.currentPlayer" />
-          <TileCard :tile="tile as PlantTile" class="aspect-square" />
+          <div class="w-full h-[calc(100%-2rem)]">
+            <TileCard :tile="tile as PlantTile" />
+          </div>
         </label>
       </div>
     </div>
@@ -30,10 +32,12 @@
       <h1 class="text-lg ">Garden</h1>
       <div class="grid grid-cols-5 gap-2 w-full border-primary border rounded-md p-2">
         <div
-          class="aspect-square w-full h-full flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
+          class="aspect-square w-full flex items-center justify-center border border-secondary rounded-md hover:bg-secondary/20 cursor-pointer"
           v-for="(tile, index) in flattenGarden(state.players[playerId].garden)"
           @click="placeTile(index % 5, Math.floor(index / 5))">
-          <TileCard v-if="tile" :tile="tile as PlantTile" />
+          <div class="w-full h-full">
+            <TileCard v-if="tile" :tile="tile as PlantTile" />
+          </div>
         </div>
       </div>
     </div>
