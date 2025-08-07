@@ -1,9 +1,10 @@
 <template>
   <div class="flex flex-col w-full h-screen p-4 gap-4 px-72" v-if="state" data-theme="dark">
     <div class="flex w-full text-xl justify-center font-mono">
-      Current player: <span class="font-bold"> {{ state.currentPlayer }}</span>
+      Current player: <span class="font-bold"> {{ state.currentPlayer }} ({{ turnState }})</span>
     </div>
-    <button class="btn btn-primary" @click="endturn" :disabled="playerId !== state.currentPlayer">End turn</button>
+    <button class="btn btn-primary" @click="endturn" :disabled="turnState !== 'END'">End turn</button>
+    <button class="btn btn-primary" @click="skipGrowPhase" :disabled="turnState !== 'GROW'">Skip grow phase</button>
     <div class="flex flex-col gap-2">
       <h1 class="text-lg">Ressources</h1>
       <div class="grid grid-cols-6 w-full border-primary border rounded-md p-2">
@@ -23,7 +24,7 @@
         <label v-for="tile in state.draftZone" :key="tile.id"
           class="flex flex-col items-center cursor-pointer p-2 gap-2">
           <input type="radio" name="draft" class="radio radio-secondary" v-model="selectedTile" :value="tile"
-            :disabled="playerId !== state.currentPlayer" />
+            :disabled="turnState !== 'PLACE'" />
           <TileCard :tile="tile" />
         </label>
       </div>
@@ -49,11 +50,11 @@
 import { ref, computed } from "vue";
 import TileCard from "./components/TileCard.vue";
 
-import { type MultiplayerGameState, type Tile, type Grid, sendCommand } from "../../engine.js";
+import { type MultiplayerGameState, type Tile, type Grid, sendCommand, type PlantTile } from "../../engine.js";
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 const state = ref<MultiplayerGameState | null>(null);
-const selectedTile = ref<Tile | null>(null);
+const selectedTile = ref<PlantTile | null>(null);
 
 // Get current palyer name from query parameters
 const urlParams = new URLSearchParams(window.location.search);
@@ -75,7 +76,7 @@ async function placeTile(x: number, y: number) {
   if (!state.value) return;
   const tileIndex = state.value.draftZone.indexOf(selectedTile.value)
 
-  const res = await sendCommand("placeTile", { playerId, tileIndex, x, y }).catch((err) => {
+  const res = await sendCommand("placePlantTile", { playerId, tileIndex, x, y }).catch((err) => {
     console.error("Error sending command:", err);
   });
 
@@ -97,6 +98,23 @@ async function endturn() {
     console.error("Failed to end turn:", res);
   }
 }
+
+async function skipGrowPhase() {
+  const res = await sendCommand("skipGrowPhase", { playerId }).catch((err) => {
+    console.error("Error sending command:", err);
+  });
+
+  if (res && res.success) {
+    console.log("Skipped grow phase successfully");
+  } else {
+    console.error("Failed to skip grow phase:", res);
+  }
+}
+
+const turnState = computed(() => {
+  if (!state.value) return "null";
+  return state.value.players[playerId].turnState;
+});
 
 // Add this computed property
 const resources = computed(() => ({

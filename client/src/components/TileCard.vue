@@ -1,5 +1,5 @@
 <template>
-    <div
+    <div v-if="tile.type === 'plant'"
         class="aspect-square p-4 bg-base-300 shadow-md w-full h-full border border-secondary rounded-md flex flex-col justify-between">
         <div class="flex w-full justify-between">
             <h5 class="card-title">{{ tile.plant.name }}</h5>
@@ -14,13 +14,19 @@
             <p class="card-text text-xs">{{ tile.plant.effect }}</p>
         </div>
     </div>
+    <div v-else-if="tile.type === 'pest'"
+        class="aspect-square p-4 bg-base-300 shadow-md w-full h-full border border-secondary rounded-md flex flex-col justify-between">
+        <div class="flex w-full justify-between">
+            <h5 class="card-title">Pest</h5>
+        </div>
+    </div>
 </template>
 
 <script lang="ts" setup>
-import { type PlantTile } from '../../../engine.ts'
+import { type Tile, type PlantTile } from '../../../engine.ts'
 
 defineProps<{
-    tile: PlantTile
+    tile: Tile
 }>()
 
 function canGrow(tile: PlantTile) {

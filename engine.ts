@@ -1,6 +1,7 @@
 type Resource = 'water' | 'light' | 'compost';
 type TileType = 'plant' | 'pest';
 type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Brook' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
+type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END';
 type Result<T> = { success: T, reason?: string };
 
 export type PlayerId = string;
@@ -11,15 +12,14 @@ export interface PlayerState {
     score: number;
     resources: Record<Resource, number>;
     infestation: number;
-    canGrow: boolean;
-    canPlace: boolean;
-    pestToPlace: 0,
+    turnState: TurnState
+    pestToPlace: number;
 }
 
 export interface MultiplayerGameState {
     players: Record<PlayerId, PlayerState>;
     deck: Tile[];
-    draftZone: Tile[];
+    draftZone: PlantTile[];
     currentTurn: number;
     currentPlayer: PlayerId;
     log: string[];
@@ -61,7 +61,6 @@ export interface GameState {
     infestation: number;
     score: number;
     turn: number;
-    log: string[];
 }
 
 type Settings = {
@@ -77,13 +76,17 @@ interface GameCommands {
         args: Parameters<MultiplayerGardenGame["growPlant"]>;
         return: ReturnType<MultiplayerGardenGame["growPlant"]>;
     };
-    placeTile: {
-        args: Parameters<MultiplayerGardenGame["placeTile"]>;
-        return: ReturnType<MultiplayerGardenGame["placeTile"]>;
+    placePlantTile: {
+        args: Parameters<MultiplayerGardenGame["placePlantTile"]>;
+        return: ReturnType<MultiplayerGardenGame["placePlantTile"]>;
     };
     nextTurn: {
         args: Parameters<MultiplayerGardenGame["nextTurn"]>;
         return: ReturnType<MultiplayerGardenGame["nextTurn"]>;
+    };
+    skipGrowPhase: {
+        args: Parameters<MultiplayerGardenGame["skipGrowPhase"]>;
+        return: ReturnType<MultiplayerGardenGame["skipGrowPhase"]>;
     };
 }
 
@@ -288,9 +291,8 @@ export class MultiplayerGardenGame {
                 score: 0,
                 resources: { water: 0, light: 0, compost: 0 },
                 infestation: 0,
-                canGrow: true,
-                canPlace: true,
-                pestToPlace: 0
+                turnState: 'PLACE',
+                pestToPlace: 0,
             };
         }
 
@@ -300,7 +302,7 @@ export class MultiplayerGardenGame {
             draftZone: [],
             currentTurn: 1,
             currentPlayer: playerIds[0],
-            log: []
+            log: [],
         };
 
         // Fill the draft zone with cards ensuring pest are not drawn first
@@ -346,7 +348,7 @@ export class MultiplayerGardenGame {
     growPlant({ playerId, x, y }: { playerId: PlayerId, x: number, y: number }): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
-        if (!playerState || !playerState.canGrow) return { success: false, reason: 'Cannot grow this turn' };
+        if (!playerState || playerState.turnState !== 'GROW') return { success: false, reason: 'Cannot grow this turn' };
 
         const tile = playerState.garden[y][x];
         if (!this.isPlantTile(tile) || tile.grown) return { success: false, reason: 'Invalid tile to grow (not plant or already grown)' };
@@ -363,16 +365,16 @@ export class MultiplayerGardenGame {
         tile.plant.growEffect(neighbors, playerState);
 
         this.log(`Player ${playerId} grew ${tile.plant.name} at (${x}, ${y})`);
-        playerState.canGrow = false;
+        this.nextTurnPhase(playerId);
 
         return { success: true, reason: undefined };
     }
 
     // Player action
-    placeTile({ playerId, tileIndex, x, y }: { playerId: PlayerId, tileIndex: number, x: number, y: number }): Result<boolean> {
+    placePlantTile({ playerId, tileIndex, x, y }: { playerId: PlayerId, tileIndex: number, x: number, y: number }): Result<boolean> {
         if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
         const playerState = this.state.players[playerId];
-        if (!playerState || !playerState.canPlace) return { success: false, reason: 'Cannot place tile this turn' };
+        if (!playerState || playerState.turnState !== 'PLACE') return { success: false, reason: 'Cannot place tile this turn' };
         if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
 
         // Select the tile from the draft zone
@@ -380,39 +382,57 @@ export class MultiplayerGardenGame {
         if (!tile) return { success: false, reason: 'Invalid tile index' };
 
         const existing = playerState.garden[y][x];
-
-        if (tile.type === 'pest') {
-            // Don't allow pest placement on compost or other pests
-            if (existing?.type === 'pest') {
-                this.log(`Player ${playerId}: Cannot place pest on ${existing.type} at (${x}, ${y})`);
-                return { success: false, reason: 'Cannot place pest on compost or other pests' };
-            }
-
-            // If placing on a plant, reduce score by plant's base points
-            if (existing && this.isPlantTile(existing)) {
-                playerState.score -= existing.plant.basePoints;
-                this.log(`Player ${playerId}: Pest destroyed ${existing.grown ? 'grown' : 'ungrown'} ${existing.plant.name} at (${x}, ${y}), lost ${existing.plant.basePoints} points`);
-            } else {
-                this.log(`Player ${playerId}: Placed pest at empty space (${x}, ${y})`);
-            }
-
-            // Place pest and check for infestation
-            playerState.garden[y][x] = tile;
-            this.checkInfestation(playerId, x, y);
-            playerState.canPlace = false;
-            return { success: true, reason: undefined };
-        }
-
-        // For non-pest tiles, only allow placement on empty spaces
         if (existing) return { success: false, reason: 'Tile already exists at this position' };
 
         playerState.garden[y][x] = tile;
         this.state.draftZone.splice(tileIndex, 1);
+
         // trigger the plant's place effect
         tile.plant.placeEffect(playerState);
+        this.nextTurnPhase(playerId);
 
-        playerState.canPlace = false;
         this.log(`Player ${playerId} placed ${tile.type} at (${x}, ${y})`);
+        return { success: true, reason: undefined };
+    }
+
+    // Player action
+    placePestTile({ playerId, x, y, tile }: { playerId: PlayerId, x: number, y: number, tile: PestTile }): Result<boolean> {
+        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+        const playerState = this.state.players[playerId];
+        if (!playerState || playerState.turnState !== 'PEST') return { success: false, reason: 'Cannot place pest this turn' };
+
+        if (!this.inBounds(x, y)) return { success: false, reason: 'Out of bounds' };
+
+        const existing = playerState.garden[y][x];
+
+        if (existing?.type === 'pest') {
+            this.log(`Player ${playerId}: Cannot place pest on ${existing.type} at (${x}, ${y})`);
+            return { success: false, reason: 'Cannot place pest on other pests' };
+        }
+
+        // If placing on a plant, reduce score by plant's base points
+        if (existing) {
+            playerState.score -= existing.plant.basePoints;
+            this.log(`Player ${playerId}: Pest destroyed ${existing.grown ? 'grown' : 'ungrown'} ${existing.plant.name} at (${x}, ${y}), lost ${existing.plant.basePoints} points`);
+        } else {
+            this.log(`Player ${playerId}: Placed pest at empty space (${x}, ${y})`);
+        }
+
+        // Place pest and check for infestation
+        playerState.garden[y][x] = tile;
+        this.checkInfestation(playerId, x, y);
+        this.nextTurnPhase(playerId);
+
+        return { success: true, reason: undefined };
+    }
+
+    // Player action
+    skipGrowPhase({ playerId }: { playerId: PlayerId }): Result<boolean> {
+        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+        const playerState = this.state.players[playerId];
+        if (!playerState || playerState.turnState !== 'GROW') return { success: false, reason: 'Cannot skip grow phase this turn' };
+
+        this.nextTurnPhase(playerId);
         return { success: true, reason: undefined };
     }
 
@@ -427,6 +447,16 @@ export class MultiplayerGardenGame {
         const playerState = this.state.players[playerId];
         if (!playerState) return;
         playerState.resources[type] = Math.min(this.settings.MAX_RESOURCES, playerState.resources[type] + amount);
+    }
+
+    private nextTurnPhase(playerId: PlayerId): void {
+        const playerState = this.state.players[playerId];
+        if (!playerState) return;
+        if (playerState.turnState === 'PLACE') playerState.turnState = 'GROW';
+        else if (playerState.turnState === 'GROW' && playerState.pestToPlace > 0) playerState.turnState = 'PEST';
+        else if (playerState.turnState === 'GROW' && playerState.pestToPlace === 0) playerState.turnState = 'END';
+        else if (playerState.turnState === 'PEST' && playerState.pestToPlace === 0) playerState.turnState = 'END';
+        else if (playerState.turnState === 'END') playerState.turnState = 'PLACE';
     }
 
     // Game action
@@ -450,7 +480,7 @@ export class MultiplayerGardenGame {
     }
 
     nextTurn({ playerId }: { playerId: PlayerId }): Result<boolean> {
-        if (playerId !== this.state.currentPlayer) return { success: false, reason: 'Not your turn' };
+        if (playerId !== this.state.currentPlayer || this.state.players[playerId].turnState !== 'END') return { success: false, reason: 'Not your turn' };
 
         const playerIds = Object.keys(this.state.players);
         const currentIndex = playerIds.indexOf(this.state.currentPlayer);
@@ -465,8 +495,7 @@ export class MultiplayerGardenGame {
         this.gainRandomResource(this.state.currentPlayer);
 
         // Reset the current player's canGrow and canPlace
-        currentPlayer.canGrow = true;
-        currentPlayer.canPlace = true;
+        currentPlayer.turnState = 'PLACE';
         currentPlayer.pestToPlace = 0;
 
         // Set the next player as current
@@ -479,7 +508,7 @@ export class MultiplayerGardenGame {
             for (const player of Object.values(this.state.players)) {
                 player.pestToPlace++;
             }
-            this.log(`All players must place a pest tile this turn`);
+            this.log(`All players gained a pest to place at the end of their turn`);
             newCard = this.drawTile();
         }
         if (newCard) {

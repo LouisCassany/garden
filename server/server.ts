@@ -37,8 +37,6 @@ app.ws("/ws", (ws, _req) => {
 // Broadcast function
 function broadcastGameState() {
     const message = JSON.stringify({ type: "update", state: game.state });
-    console.log("Broadcasting game state to", sockets.size, "clients");
-
     for (const socket of sockets) {
         if (socket.readyState === 1) { // 1 = OPEN
             socket.send(message);
