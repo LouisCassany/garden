@@ -2,7 +2,7 @@ import express from "express";
 import expressWs from "express-ws";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { MultiplayerGardenGame, Command } from "./engine";
+import { MultiplayerGardenGame, Command } from "../engine";
 
 const app = express();
 expressWs(app); // Enable WebSocket support
