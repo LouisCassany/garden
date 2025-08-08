@@ -16,7 +16,7 @@ const GAME_SETTINGS = {
     DRAFT_SIZE: 5,
 };
 
-const game = new MultiplayerGardenGame(["louis", "melanie"], GAME_SETTINGS);
+const game = new MultiplayerGardenGame(["louis"], GAME_SETTINGS);
 const sockets = new Set<WebSocket>();
 
 app.use(cors());

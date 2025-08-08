@@ -1,6 +1,5 @@
 type Resource = 'water' | 'light' | 'compost';
-type TileType = 'plant' | 'pest';
-type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Brook' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
+type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Pond' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
 export type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END';
 type Result<T> = { success: T, reason?: string };
 
@@ -33,20 +32,18 @@ interface PlantData {
     growEffect: (neighbors: Tile[], playerState: PlayerState) => void;
     effect: string
     description: string;
+    isPlant: boolean;
 }
 
-interface TileBase {
+export interface PlantTile {
     id: string;
-    type: TileType;
-}
-
-export interface PlantTile extends TileBase {
     type: 'plant';
     plant: PlantData;
     grown: boolean;
 }
 
-interface PestTile extends TileBase {
+interface PestTile {
+    id: string;
     type: 'pest';
 }
 
@@ -103,7 +100,7 @@ type CommandMap = {
 export async function sendCommand<K extends keyof GameCommands>(
     type: K, args: GameCommands[K]["args"][0]
 ): Promise<Awaited<GameCommands[K]["return"]>> {
-    const res = await fetch("http://localhost:3000/cmd", {
+    const res = await fetch("http://192.168.1.33:3000/cmd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, args: [args] }),
@@ -128,7 +125,7 @@ const plantLibrary: PlantData[] = [
         growthCost: { water: 1, light: 1 },
         basePoints: 2,
         growEffect: (neighbors, playerState) => {
-            const neighborsCount = neighbors.filter(t => t?.type === 'plant' && t.plant.name !== 'Lavender').length;
+            const neighborsCount = neighbors.filter(t => t?.type === 'plant' && t.plant.name !== 'Lavender' && t.plant.isPlant).length;
             if (neighborsCount > 0) {
                 playerState.score += neighborsCount;
             }
@@ -136,12 +133,12 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Lavender thrives near other plants, but not near Lavender itself.',
         effect: '+1 point for each different plant neighbor',
+        isPlant: true,
     },
     {
         name: 'Sunflower',
         growthCost: { light: 2 },
         basePoints: 2,
-        // placeEffect: (neighbors) => neighbors.some(t => t?.type === 'plant' && t.plant.name === 'Compost') ? 1 : 0,
         growEffect: (neighbors, playerState) => {
             const neighborsCount = neighbors.some(t => t?.type === 'plant' && t.plant.name === 'Compost') ? 1 : 0;
             if (neighborsCount > 0) {
@@ -151,6 +148,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Sunflower loves compost.',
         effect: '+1 point for each compost neighbor',
+        isPlant: true,
     },
     {
         name: 'Mushroom',
@@ -165,22 +163,24 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         effect: '+1 point for each Tree neighbor',
         description: 'Mushrooms grow well near trees.',
+        isPlant: true,
     },
     {
         name: 'Tree',
-        growthCost: { water: 2, compost: 2 },
+        growthCost: {},
         basePoints: 3,
         placeEffect: () => { },
         growEffect: () => { },
         description: 'Trees are strong but require more resources.',
-        effect: ""
+        effect: "",
+        isPlant: true,
     },
     {
         name: 'Daisy',
         growthCost: { water: 1, light: 1 },
         basePoints: 1,
         growEffect: (neighbors, playerState) => {
-            const neighborsCount = neighbors.some(t => t?.type === 'plant') ? 1 : 0;
+            const neighborsCount = neighbors.some(t => t?.type === 'plant' && t.plant.isPlant) ? 1 : 0;
             if (neighborsCount > 0) {
                 playerState.score += neighborsCount;
             }
@@ -188,7 +188,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Daisies love being around other plants.',
         effect: '+1 point for each plant neighbor',
-
+        isPlant: true,
     },
     {
         name: 'Compost',
@@ -200,17 +200,19 @@ const plantLibrary: PlantData[] = [
         },
         description: 'Compost is a nutritious resource that can be used to grow plants.',
         effect: '+1 compost resource',
+        isPlant: false,
     },
     {
-        name: 'Brook',
+        name: 'Pond',
         growthCost: {},
         basePoints: 0,
         growEffect: () => { },
         placeEffect: (playerState) => {
             playerState.resources.water += 2;
         },
-        description: 'Brooks are a source of water.',
+        description: 'Ponds are a source of water.',
         effect: '+2 water resources',
+        isPlant: false,
     },
     {
         name: 'Cactus',
@@ -225,6 +227,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Cactus thrives in isolation.',
         effect: '+1 point for each empty adjacent space',
+        isPlant: true,
     },
     {
         name: 'Bamboo',
@@ -241,6 +244,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Bamboo grows in clusters.',
         effect: '+2 points for each adjacent Bamboo',
+        isPlant: true,
     },
     {
         name: 'Vine',
@@ -257,6 +261,7 @@ const plantLibrary: PlantData[] = [
         placeEffect: () => { },
         description: 'Vines benefit from grown plants.',
         effect: '+1 point for each grown neighbor',
+        isPlant: true,
     },
     {
         name: 'Fern',
@@ -272,7 +277,8 @@ const plantLibrary: PlantData[] = [
         },
         placeEffect: () => { },
         description: 'Ferns grow in tree shade. ',
-        effect: "+1 light resource when next to a Tree"
+        effect: "+1 light resource when next to a Tree",
+        isPlant: true,
     },
 ];
 
@@ -289,7 +295,7 @@ export class MultiplayerGardenGame {
                 id,
                 garden: Array.from({ length: settings.GRID_SIZE }, () => Array(settings.GRID_SIZE).fill(null)),
                 score: 0,
-                resources: { water: 0, light: 0, compost: 0 },
+                resources: { water: 5, light: 5, compost: 5 },
                 infestation: 0,
                 turnState: 'PLACE',
                 pestToPlace: 0,
@@ -337,9 +343,9 @@ export class MultiplayerGardenGame {
             }
         }
 
-        for (let i = 0; i < 5 * playerCount; i++) {
-            deck.push({ id: generateId(), type: 'pest' });
-        }
+        // for (let i = 0; i < 5 * playerCount; i++) {
+        //     deck.push({ id: generateId(), type: 'pest' });
+        // }
 
         return this.shuffle(deck);
     }
@@ -352,6 +358,10 @@ export class MultiplayerGardenGame {
 
         const tile = playerState.garden[y][x];
         if (!this.isPlantTile(tile) || tile.grown) return { success: false, reason: 'Invalid tile to grow (not plant or already grown)' };
+
+        // if the plant have no growth cost, it can't be grown
+        const resourcesNeeded = tile.plant.growthCost;
+        if (!resourcesNeeded || Object.keys(resourcesNeeded).length === 0) return { success: false, reason: 'Invalid tile to grow (no growth cost)' };
 
         const cost = tile.plant.growthCost;
         if (!this.hasResources(playerId, cost)) return { success: false, reason: 'Not enough resources' };
@@ -389,6 +399,7 @@ export class MultiplayerGardenGame {
 
         // trigger the plant's place effect
         tile.plant.placeEffect(playerState);
+        playerState.score += tile.plant.basePoints;
         this.nextTurnPhase(playerId);
 
         this.log(`Player ${playerId} placed ${tile.type} at (${x}, ${y})`);
@@ -483,7 +494,7 @@ export class MultiplayerGardenGame {
         if (playerId !== this.state.currentPlayer || this.state.players[playerId].turnState !== 'END') return { success: false, reason: 'Not your turn' };
 
         const playerIds = Object.keys(this.state.players);
-        const currentIndex = playerIds.indexOf(this.state.currentPlayer);
+        const currentIndex = playerIds.indexOf(playerId);
         const nextIndex = (currentIndex + 1) % playerIds.length;
 
         if (nextIndex === 0) {
@@ -491,8 +502,8 @@ export class MultiplayerGardenGame {
         }
 
         // Make the current player gain 1 random resource
-        const currentPlayer = this.state.players[this.state.currentPlayer];
-        this.gainRandomResource(this.state.currentPlayer);
+        const currentPlayer = this.state.players[playerId];
+        this.gainRandomResource(playerId);
 
         // Reset the current player's canGrow and canPlace
         currentPlayer.turnState = 'PLACE';
