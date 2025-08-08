@@ -3,6 +3,7 @@ import expressWs from "express-ws";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { MultiplayerGardenGame, Command } from "../engine";
+import path from "path";
 
 const app = express();
 expressWs(app); // Enable WebSocket support
@@ -21,6 +22,8 @@ const sockets = new Set<WebSocket>();
 
 app.use(cors());
 app.use(bodyParser.json());
+
+app.use(express.static(path.join(__dirname, "public")));
 
 // WebSocket route
 //@ts-ignore
