@@ -33,12 +33,7 @@
         </div>
     </div>
 
-    <div v-else-if="tile.type === 'pest'"
-        class="aspect-square w-full bg-base-300 shadow-md border border-secondary rounded-md flex flex-col justify-between overflow-hidden p-1 text-xs">
-        <div class="flex w-full justify-between">
-            <h5 class="truncate">Pest</h5>
-        </div>
-    </div>
+    <img src="/pest.jpeg" class="size-full rounded-md border border-secondary" v-else-if="tile.type === 'pest'" />
 </template>
 
 <script lang="ts" setup>

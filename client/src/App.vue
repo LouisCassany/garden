@@ -2,11 +2,11 @@
   <div class="flex flex-col w-full gap-2 p-4" v-if="state" data-theme="dark">
 
     <div class="flex flex-col w-full gap-2">
-      <div class="flex w-full text-xl justify-center font-mono">
-        Current player: <span class="font-bold"> {{ state.currentPlayer }} ({{ turnState }})</span>
-      </div>
       <button class="btn btn-primary" @click="skipGrowPhase" :disabled="turnState !== 'GROW'">Skip grow phase</button>
       <button class="btn btn-primary" @click="endturn" :disabled="turnState !== 'END'">End turn</button>
+      <div class="w-full text-center uppercase text-lg font-bold font-mono">
+        {{ state.currentPlayer === playerId ? 'Current action: ' + turnState : 'Not your turn' }}
+      </div>
       <div class="flex flex-col gap-2 border-primary border rounded-md p-2">
         <h1 class="text-lg">Ressources</h1>
         <div class="grid grid-cols-6 w-full">
@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <div class="flex flex-col gap-2 w-full border-primary border rounded-md p-2 ">
+    <div class="flex flex-col gap-2 w-full border-primary border rounded-md p-2">
       <h1 class="text-lg">Draft zone</h1>
       <div class="flex gap-2 w-full  h-full overflow-y-auto pb-2">
         <label v-for="tile in state.draftZone" :key="tile.id" class="flex flex-col items-center cursor-pointer gap-2">
@@ -65,8 +65,13 @@
               <div>
                 {{ modalTile?.plant.effect }}
               </div>
-              <button class="btn btn-sm btn-primary" :disabled="!canBeGrown(modalTile)"
-                @click="growTile(modalTileIndex! % 5, Math.floor(modalTileIndex! / 5))">Grow</button>
+              <div class="flex w-full gap-4 justify-between">
+                <button class="btn btn-sm btn-primary" :disabled="!canBeGrown(modalTile)"
+                  @click="growTile(modalTileIndex! % 5, Math.floor(modalTileIndex! / 5))">Grow</button>
+                <button class="btn btn-sm btn-error " v-if="turnState === 'PEST'"
+                  @click="placePestTile(modalTileIndex! % 5, Math.floor(modalTileIndex! / 5))">Place pest</button>
+              </div>
+
             </div>
           </div>
         </div>
@@ -75,6 +80,7 @@
         <button>close</button>
       </form>
     </dialog>
+    <button class="btn btn-warning" @click="resetGame()">Reset game</button>
   </div>
 </template>
 
@@ -91,15 +97,26 @@ const modalTile = ref<Tile | null>(null);
 const modalTileIndex = ref<number | null>(null);
 
 // Get current palyer name from query parameters
-// const urlParams = new URLSearchParams(window.location.search);
-// const playerId = urlParams.get('playerId') as string;
-const playerId = 'louis';
+const urlParams = new URLSearchParams(window.location.search);
+const playerId = urlParams.get('playerId') as string;
 
 socket.onmessage = (event) => {
   const data = JSON.parse(event.data);
   state.value = data.state as MultiplayerGameState;
   selectedTile.value = state.value.draftZone[0];
 };
+
+function resetGame() {
+  fetch("http://192.168.1.33:3000/reset", {
+    method: "GET",
+  }).then((res) => {
+    if (res.ok) {
+      console.log("Game reset successfully");
+    } else {
+      console.error("Failed to reset game:", res);
+    }
+  });
+}
 
 function flattenGarden(garden: Grid): (Tile | null)[] {
   if (!garden) return [];
@@ -110,6 +127,23 @@ function openModal(plant: Tile, index: number) {
   modalTile.value = plant;
   modalTileIndex.value = index;
   (document.getElementById("my_modal_2") as HTMLDialogElement).showModal();
+}
+
+async function placePestTile(x: number, y: number) {
+  if (!selectedTile.value) return;
+  if (!state.value) return;
+
+  if (turnState.value === 'PEST') {
+    const res = await sendCommand("placePestTile", { playerId, x, y, tile: { type: 'pest' } }).catch((err) => {
+      console.error("Error sending command:", err);
+    });
+    if (res && res.success) {
+      console.log("Tile placed successfully");
+      (document.getElementById("my_modal_2") as HTMLDialogElement).close();
+    } else {
+      console.error("Failed to place tile:", res);
+    }
+  }
 }
 
 async function growTile(x: number, y: number) {
@@ -130,16 +164,27 @@ async function growTile(x: number, y: number) {
 async function placeTile(x: number, y: number) {
   if (!selectedTile.value) return;
   if (!state.value) return;
-  const tileIndex = state.value.draftZone.indexOf(selectedTile.value)
 
-  const res = await sendCommand("placePlantTile", { playerId, tileIndex, x, y }).catch((err) => {
-    console.error("Error sending command:", err);
-  });
-
-  if (res && res.success) {
-    console.log("Tile placed successfully");
-  } else {
-    console.error("Failed to place tile:", res);
+  if (turnState.value === 'PLACE') {
+    const tileIndex = state.value.draftZone.indexOf(selectedTile.value)
+    const res = await sendCommand("placePlantTile", { playerId, tileIndex, x, y }).catch((err) => {
+      console.error("Error sending command:", err);
+    });
+    if (res && res.success) {
+      console.log("Tile placed successfully");
+    } else {
+      console.error("Failed to place tile:", res);
+    }
+  }
+  else if (turnState.value === 'PEST') {
+    const res = await sendCommand("placePestTile", { playerId, x, y, tile: { type: 'pest' } }).catch((err) => {
+      console.error("Error sending command:", err);
+    });
+    if (res && res.success) {
+      console.log("Tile placed successfully");
+    } else {
+      console.error("Failed to place tile:", res);
+    }
   }
 }
 

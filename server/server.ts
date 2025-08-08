@@ -11,12 +11,12 @@ const PORT = 3000;
 
 const GAME_SETTINGS = {
     GRID_SIZE: 5,
-    MAX_RESOURCES: 5,
+    MAX_RESOURCES: 20,
     MAX_INFESTATIONS: 3,
     DRAFT_SIZE: 5,
 };
 
-const game = new MultiplayerGardenGame(["louis"], GAME_SETTINGS);
+let game = new MultiplayerGardenGame(["louis", "melanie"], GAME_SETTINGS);
 const sockets = new Set<WebSocket>();
 
 app.use(cors());
@@ -43,6 +43,14 @@ function broadcastGameState() {
         }
     }
 }
+
+// Special get endpoint to reset the game
+app.get("/reset", (_, res) => {
+    game = new MultiplayerGardenGame(["louis", "melanie"], GAME_SETTINGS);
+    console.log("Game reset");
+    broadcastGameState();
+    res.json({ success: true });
+});
 
 // Command route
 app.post("/cmd", (req, res) => {

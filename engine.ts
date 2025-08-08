@@ -1,6 +1,6 @@
 type Resource = 'water' | 'light' | 'compost';
 type PlantName = 'Lavender' | 'Sunflower' | 'Mushroom' | 'Tree' | 'Daisy' | 'Compost' | 'Pond' | 'Cactus' | 'Bamboo' | 'Vine' | 'Fern';
-export type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END';
+export type TurnState = 'PLACE' | 'GROW' | 'PEST' | 'END' | 'DONE';
 type Result<T> = { success: T, reason?: string };
 
 export type PlayerId = string;
@@ -29,7 +29,7 @@ interface PlantData {
     growthCost: Partial<Record<Resource, number>>;
     basePoints: number;
     placeEffect: (playerState: PlayerState) => void;
-    growEffect: (neighbors: Tile[], playerState: PlayerState) => void;
+    growEffect: (neighbors: (Tile | null)[], playerState: PlayerState) => void;
     effect: string
     description: string;
     isPlant: boolean;
@@ -43,7 +43,6 @@ export interface PlantTile {
 }
 
 interface PestTile {
-    id: string;
     type: 'pest';
 }
 
@@ -84,6 +83,10 @@ interface GameCommands {
     skipGrowPhase: {
         args: Parameters<MultiplayerGardenGame["skipGrowPhase"]>;
         return: ReturnType<MultiplayerGardenGame["skipGrowPhase"]>;
+    };
+    placePestTile: {
+        args: Parameters<MultiplayerGardenGame["placePestTile"]>;
+        return: ReturnType<MultiplayerGardenGame["placePestTile"]>;
     };
 }
 
@@ -295,7 +298,7 @@ export class MultiplayerGardenGame {
                 id,
                 garden: Array.from({ length: settings.GRID_SIZE }, () => Array(settings.GRID_SIZE).fill(null)),
                 score: 0,
-                resources: { water: 5, light: 5, compost: 5 },
+                resources: { water: 1, light: 1, compost: 1 },
                 infestation: 0,
                 turnState: 'PLACE',
                 pestToPlace: 0,
@@ -332,7 +335,7 @@ export class MultiplayerGardenGame {
         const deck: Tile[] = [];
 
         // Scale cards with player count
-        for (let i = 0; i < 4 * playerCount; i++) {
+        for (let i = 0; i < 3 * playerCount; i++) {
             for (const plant of plantLibrary) {
                 deck.push({
                     id: generateId(),
@@ -343,9 +346,9 @@ export class MultiplayerGardenGame {
             }
         }
 
-        // for (let i = 0; i < 5 * playerCount; i++) {
-        //     deck.push({ id: generateId(), type: 'pest' });
-        // }
+        for (let i = 0; i < 34 * playerCount; i++) {
+            deck.push({ type: 'pest' });
+        }
 
         return this.shuffle(deck);
     }
@@ -432,6 +435,8 @@ export class MultiplayerGardenGame {
         // Place pest and check for infestation
         playerState.garden[y][x] = tile;
         this.checkInfestation(playerId, x, y);
+        // Decrease pest count
+        playerState.pestToPlace--;
         this.nextTurnPhase(playerId);
 
         return { success: true, reason: undefined };
@@ -467,7 +472,10 @@ export class MultiplayerGardenGame {
         else if (playerState.turnState === 'GROW' && playerState.pestToPlace > 0) playerState.turnState = 'PEST';
         else if (playerState.turnState === 'GROW' && playerState.pestToPlace === 0) playerState.turnState = 'END';
         else if (playerState.turnState === 'PEST' && playerState.pestToPlace === 0) playerState.turnState = 'END';
-        else if (playerState.turnState === 'END') playerState.turnState = 'PLACE';
+        else if (playerState.turnState === 'END') {
+            if (this.isPlayerDonePlaying(playerId)) playerState.turnState = 'DONE';
+            else playerState.turnState = 'PLACE';
+        }
     }
 
     // Game action
@@ -483,11 +491,9 @@ export class MultiplayerGardenGame {
         }
     }
 
-    private getNeighbors(garden: Grid, x: number, y: number): Tile[] {
+    private getNeighbors(garden: Grid, x: number, y: number): (Tile | null)[] {
         const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-        return dirs
-            .map(([dx, dy]) => this.inBounds(x + dx, y + dy) ? garden[y + dy][x + dx] : null)
-            .filter(Boolean) as Tile[];
+        return dirs.map(([dx, dy]) => this.inBounds(x + dx, y + dy) ? garden[y + dy][x + dx] : null);
     }
 
     nextTurn({ playerId }: { playerId: PlayerId }): Result<boolean> {
@@ -500,14 +506,6 @@ export class MultiplayerGardenGame {
         if (nextIndex === 0) {
             this.state.currentTurn++;
         }
-
-        // Make the current player gain 1 random resource
-        const currentPlayer = this.state.players[playerId];
-        this.gainRandomResource(playerId);
-
-        // Reset the current player's canGrow and canPlace
-        currentPlayer.turnState = 'PLACE';
-        currentPlayer.pestToPlace = 0;
 
         // Set the next player as current
         this.state.currentPlayer = playerIds[nextIndex];
@@ -525,22 +523,21 @@ export class MultiplayerGardenGame {
         if (newCard) {
             this.state.draftZone.push(newCard);
         }
+        this.nextTurnPhase(playerId);
+        this.gainRandomResource(playerId);
+        this.gainRandomResource(playerId);
         return { success: true };
     }
 
-    isGameOver(): boolean {
-        // Game ends if any player hits the conditions
-
-        return Array.from(Object.values(this.state.players)).some(player =>
-            player.infestation >= this.settings.MAX_INFESTATIONS ||
-            this.state.deck.length === 0 ||
-            player.garden.every(row => row.every(cell => cell !== null))
-        );
+    isPlayerDonePlaying(playerId: PlayerId): boolean {
+        const playerState = this.state.players[playerId];
+        if (!playerState) return false;
+        // game ends if the player have a full garden or they hit the max infestation
+        return playerState.garden.every(row => row.every(cell => cell !== null)) || playerState.infestation >= this.settings.MAX_INFESTATIONS;
     }
 
-    getWinner(): PlayerId | null {
-        if (!this.isGameOver()) return null;
 
+    getWinner(): PlayerId | null {
         let highestScore = -1;
         let winner: PlayerId | null = null;
 
